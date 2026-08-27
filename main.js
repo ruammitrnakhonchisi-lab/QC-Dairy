@@ -266,22 +266,96 @@ function makeDefaultTemplates(){
   ];
 }
 
-function ensureSeed(){
+function ensureSeedLocal(){
   if (load(KEYS.employees, null) == null) save(KEYS.employees, DEFAULT_EMPLOYEES);
   if (load(KEYS.templates, null) == null) save(KEYS.templates, makeDefaultTemplates());
   if (load(KEYS.records, null) == null) save(KEYS.records, []);
-  if (load(KEYS.settings, null) == null) save(KEYS.settings, {theme:'system'});
+}
+
+/* ---------------- cloud sync (Firestore) ---------------- */
+const CLOUD = { _templates: undefined, _employees: undefined, _records: undefined };
+function cloudErr(err){ console.error('cloud sync error', err); toast('ซิงค์ข้อมูลไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต','err'); }
+function cloudDocRef(name){ return firebase.firestore().collection('qc_meta').doc(name); }
+function cloudCol(name){ return firebase.firestore().collection(name); }
+
+function initCloudSync(){
+  return new Promise((resolve)=>{
+    if (typeof FIREBASE_CONFIGURED === 'undefined' || !FIREBASE_CONFIGURED){ resolve(); return; }
+    const db = firebase.firestore();
+    try{ db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
+
+    let need = 3, got = 0, doneOnce = false;
+    const bump = ()=>{ got++; if (got>=need && !doneOnce){ doneOnce=true; resolve(); } };
+    let firstTpl=false, firstEmp=false, firstRec=false;
+
+    firebase.auth().onAuthStateChanged(user=>{
+      if (!user){
+        firebase.auth().signInAnonymously().catch(err=>{
+          console.error('anonymous sign-in failed', err);
+          toast('เชื่อมต่อระบบซิงค์ไม่สำเร็จ (ทำงานแบบออฟไลน์)','err');
+          if (!doneOnce){ doneOnce=true; resolve(); }
+        });
+        return;
+      }
+      db.collection('qc_meta').doc('templates').onSnapshot(snap=>{
+        CLOUD._templates = (snap.exists && snap.data().list) || [];
+        if (CLOUD._templates.length===0 && !snap.metadata.fromCache){ DB.saveTemplates(makeDefaultTemplates()); }
+        if (!firstTpl){ firstTpl=true; bump(); }
+        render();
+      }, err=>{ cloudErr(err); if (!firstTpl){ firstTpl=true; bump(); } });
+
+      db.collection('qc_meta').doc('employees').onSnapshot(snap=>{
+        CLOUD._employees = (snap.exists && snap.data().list) || [];
+        if (CLOUD._employees.length===0 && !snap.metadata.fromCache){ DB.saveEmployees(DEFAULT_EMPLOYEES); }
+        if (!firstEmp){ firstEmp=true; bump(); }
+        render();
+      }, err=>{ cloudErr(err); if (!firstEmp){ firstEmp=true; bump(); } });
+
+      db.collection('records').orderBy('createdAt','desc').onSnapshot(snap=>{
+        CLOUD._records = snap.docs.map(d=>d.data());
+        if (!firstRec){ firstRec=true; bump(); }
+        render();
+      }, err=>{ cloudErr(err); if (!firstRec){ firstRec=true; bump(); } });
+    });
+
+    setTimeout(()=>{ if (!doneOnce){ doneOnce=true; resolve(); } }, 6000);
+  });
+}
+function updateSyncBadge(){
+  const badge = qs('#syncBadge');
+  if (!badge || typeof FIREBASE_CONFIGURED === 'undefined' || !FIREBASE_CONFIGURED) return;
+  badge.hidden = false;
+  const online = navigator.onLine;
+  badge.classList.toggle('online', online);
+  badge.classList.toggle('offline', !online);
+  qs('#syncBadgeText').textContent = online ? 'ออนไลน์' : 'ออฟไลน์';
 }
 
 /* ---------------- data access ---------------- */
 const DB = {
-  employees(){ return load(KEYS.employees, []); },
-  saveEmployees(v){ save(KEYS.employees, v); },
-  templates(){ return load(KEYS.templates, []); },
-  saveTemplates(v){ save(KEYS.templates, v); },
+  employees(){ return (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) ? (CLOUD._employees||[]) : load(KEYS.employees, []); },
+  saveEmployees(v){
+    if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){ CLOUD._employees = v; cloudDocRef('employees').set({list:v}).catch(cloudErr); }
+    else save(KEYS.employees, v);
+  },
+  templates(){ return (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) ? (CLOUD._templates||[]) : load(KEYS.templates, []); },
+  saveTemplates(v){
+    if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){ CLOUD._templates = v; cloudDocRef('templates').set({list:v}).catch(cloudErr); }
+    else save(KEYS.templates, v);
+  },
   template(id){ return this.templates().find(t=>t.id===id); },
-  records(){ return load(KEYS.records, []); },
-  saveRecords(v){ save(KEYS.records, v); },
+  records(){ return (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) ? (CLOUD._records||[]) : load(KEYS.records, []); },
+  saveRecords(v){
+    if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){
+      const oldIds = new Set((CLOUD._records||[]).map(r=>r.id));
+      const newIds = new Set(v.map(r=>r.id));
+      const batch = firebase.firestore().batch();
+      v.forEach(r=>batch.set(cloudCol('records').doc(r.id), r));
+      oldIds.forEach(id=>{ if (!newIds.has(id)) batch.delete(cloudCol('records').doc(id)); });
+      CLOUD._records = v;
+      batch.commit().catch(cloudErr);
+    } else save(KEYS.records, v);
+  },
   record(id){ return this.records().find(r=>r.id===id); },
   settings(){ return load(KEYS.settings, {theme:'system'}); },
   saveSettings(v){ save(KEYS.settings, v); },
@@ -1729,11 +1803,22 @@ function clearOldPhotos(){
 /* ============================================================
    BOOT
    ============================================================ */
-function boot(){
-  ensureSeed();
+async function boot(){
   applyTheme();
   qs('#btnBack').addEventListener('click', back);
   qsa('.tab-item').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
+
+  if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){
+    qs('#syncOverlay').hidden = false;
+    updateSyncBadge();
+    window.addEventListener('online', updateSyncBadge);
+    window.addEventListener('offline', updateSyncBadge);
+    await initCloudSync();
+    qs('#syncOverlay').hidden = true;
+  } else {
+    ensureSeedLocal();
+  }
+
   render();
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
     navigator.serviceWorker.register('sw.js').catch(()=>{});

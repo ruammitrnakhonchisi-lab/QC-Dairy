@@ -21,6 +21,7 @@
       <span id="topbarTitle">QC Precast</span>
       <span id="topbarSubtitle" class="topbar-subtitle"></span>
     </div>
+    <span class="sync-badge online" id="syncBadge" hidden><span class="dot"></span><span id="syncBadgeText">ออนไลน์</span></span>
     <button class="icon-btn" id="btnMenuAction" hidden aria-label="เมนู">⋮</button>
   </header>
 
@@ -49,7 +50,15 @@
 
 <div id="modalRoot"></div>
 <div id="toastRoot" class="toast-root"></div>
+<div id="syncOverlay" class="sync-overlay" hidden>
+  <div class="sync-spinner"></div>
+  <div class="sync-msg">กำลังซิงค์ข้อมูล…</div>
+</div>
 
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script src="main.js"></script>
 </body>
 </html>
