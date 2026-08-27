@@ -280,45 +280,63 @@ function cloudCol(name){ return firebase.firestore().collection(name); }
 
 function initCloudSync(){
   return new Promise((resolve)=>{
-    if (typeof FIREBASE_CONFIGURED === 'undefined' || !FIREBASE_CONFIGURED){ resolve(); return; }
-    const db = firebase.firestore();
-    try{ db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
-
     let need = 3, got = 0, doneOnce = false;
-    const bump = ()=>{ got++; if (got>=need && !doneOnce){ doneOnce=true; resolve(); } };
-    let firstTpl=false, firstEmp=false, firstRec=false;
+    const finish = ()=>{ if (!doneOnce){ doneOnce=true; resolve(); } };
+    const bump = ()=>{ got++; if (got>=need) finish(); };
+    // Absolute safety net: never let a stuck/slow/broken connection block the app
+    // from loading. Whatever happens with Firestore, we proceed after this.
+    setTimeout(finish, 6000);
 
-    firebase.auth().onAuthStateChanged(user=>{
-      if (!user){
-        firebase.auth().signInAnonymously().catch(err=>{
-          console.error('anonymous sign-in failed', err);
-          toast('เชื่อมต่อระบบซิงค์ไม่สำเร็จ (ทำงานแบบออฟไลน์)','err');
-          if (!doneOnce){ doneOnce=true; resolve(); }
-        });
-        return;
+    try{
+      if (typeof FIREBASE_CONFIGURED === 'undefined' || !FIREBASE_CONFIGURED){ finish(); return; }
+      if (typeof firebase === 'undefined' || !firebase.firestore){
+        console.error('Firebase SDK failed to load');
+        toast('โหลดระบบซิงค์ไม่สำเร็จ (เครือข่ายอาจบล็อก) กำลังใช้งานแบบออฟไลน์','err');
+        finish(); return;
       }
-      db.collection('qc_meta').doc('templates').onSnapshot(snap=>{
-        CLOUD._templates = (snap.exists && snap.data().list) || [];
-        if (CLOUD._templates.length===0 && !snap.metadata.fromCache){ DB.saveTemplates(makeDefaultTemplates()); }
-        if (!firstTpl){ firstTpl=true; bump(); }
-        render();
-      }, err=>{ cloudErr(err); if (!firstTpl){ firstTpl=true; bump(); } });
+      const db = firebase.firestore();
+      try{ db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
 
-      db.collection('qc_meta').doc('employees').onSnapshot(snap=>{
-        CLOUD._employees = (snap.exists && snap.data().list) || [];
-        if (CLOUD._employees.length===0 && !snap.metadata.fromCache){ DB.saveEmployees(DEFAULT_EMPLOYEES); }
-        if (!firstEmp){ firstEmp=true; bump(); }
-        render();
-      }, err=>{ cloudErr(err); if (!firstEmp){ firstEmp=true; bump(); } });
+      let firstTpl=false, firstEmp=false, firstRec=false;
 
-      db.collection('records').orderBy('createdAt','desc').onSnapshot(snap=>{
-        CLOUD._records = snap.docs.map(d=>d.data());
-        if (!firstRec){ firstRec=true; bump(); }
-        render();
-      }, err=>{ cloudErr(err); if (!firstRec){ firstRec=true; bump(); } });
-    });
+      firebase.auth().onAuthStateChanged(user=>{
+        if (!user){
+          firebase.auth().signInAnonymously().catch(err=>{
+            console.error('anonymous sign-in failed', err);
+            toast('เชื่อมต่อระบบซิงค์ไม่สำเร็จ (ทำงานแบบออฟไลน์)','err');
+            finish();
+          });
+          return;
+        }
+        try{
+          db.collection('qc_meta').doc('templates').onSnapshot(snap=>{
+            CLOUD._templates = (snap.exists && snap.data().list) || [];
+            if (CLOUD._templates.length===0 && !snap.metadata.fromCache){ DB.saveTemplates(makeDefaultTemplates()); }
+            if (!firstTpl){ firstTpl=true; bump(); }
+            render();
+          }, err=>{ cloudErr(err); if (!firstTpl){ firstTpl=true; bump(); } });
 
-    setTimeout(()=>{ if (!doneOnce){ doneOnce=true; resolve(); } }, 6000);
+          db.collection('qc_meta').doc('employees').onSnapshot(snap=>{
+            CLOUD._employees = (snap.exists && snap.data().list) || [];
+            if (CLOUD._employees.length===0 && !snap.metadata.fromCache){ DB.saveEmployees(DEFAULT_EMPLOYEES); }
+            if (!firstEmp){ firstEmp=true; bump(); }
+            render();
+          }, err=>{ cloudErr(err); if (!firstEmp){ firstEmp=true; bump(); } });
+
+          db.collection('records').orderBy('createdAt','desc').onSnapshot(snap=>{
+            CLOUD._records = snap.docs.map(d=>d.data());
+            if (!firstRec){ firstRec=true; bump(); }
+            render();
+          }, err=>{ cloudErr(err); if (!firstRec){ firstRec=true; bump(); } });
+        }catch(err){
+          console.error('failed to attach Firestore listeners', err);
+          finish();
+        }
+      }, err=>{ console.error('auth state error', err); finish(); });
+    }catch(err){
+      console.error('initCloudSync failed', err);
+      finish();
+    }
   });
 }
 function updateSyncBadge(){
@@ -1813,7 +1831,13 @@ async function boot(){
     updateSyncBadge();
     window.addEventListener('online', updateSyncBadge);
     window.addEventListener('offline', updateSyncBadge);
-    await initCloudSync();
+    try{
+      // Hard outer cap in addition to initCloudSync's own internal timeout —
+      // guarantees the app never gets stuck on the loading screen.
+      await Promise.race([initCloudSync(), new Promise(r=>setTimeout(r, 9000))]);
+    }catch(err){
+      console.error('boot: cloud sync failed', err);
+    }
     qs('#syncOverlay').hidden = true;
   } else {
     ensureSeedLocal();
