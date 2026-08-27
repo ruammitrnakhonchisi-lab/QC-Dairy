@@ -233,6 +233,11 @@ button,input,select,textarea{font-family:inherit;color:inherit;}
 .chk-item:last-child{border-bottom:none;}
 .chk-item .chk-label{font-size:13.5px; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:6px;}
 .chk-item .chk-label .u{font-weight:400; color:var(--text-dim); font-size:11.5px;}
+.duration-box{
+  padding:11px 12px; border:1px dashed var(--border); border-radius:10px; background:var(--surface-2);
+  color:var(--text-dim); font-size:14.5px; font-weight:600;
+}
+.duration-box:not(:empty)::before{content:'⏱ ';}
 
 .photo-strip{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;}
 .photo-thumb{position:relative; width:64px; height:64px; border-radius:8px; overflow:hidden; border:1px solid var(--border);}

@@ -106,12 +106,15 @@ const PILE_A_SECTIONS = () => ([
   {id:uid(), title:'8. เหล็กเสริมพิเศษตาม PO', fields:[
     {id:uid(), label:'การใส่จำนวนเหล็กเสริมพิเศษตาม PO', type:'pass'}
   ]},
-  {id:uid(), title:'9. การเทคอนกรีต', fields:[
-    {id:uid(), label:'เวลาเริ่มเท', type:'time'},
-    {id:uid(), label:'เวลาเสร็จ', type:'time'},
-    {id:uid(), label:'ระยะเวลารวมในการเทคอนกรีต', type:'text'},
-    {id:uid(), label:'เวลาที่ตัดลวดได้', type:'time'}
-  ]}
+  (()=>{
+    const startT = {id:uid(), label:'เวลาเริ่มเท', type:'time'};
+    const endT = {id:uid(), label:'เวลาเสร็จ', type:'time'};
+    return {id:uid(), title:'9. การเทคอนกรีต', fields:[
+      startT, endT,
+      {id:uid(), label:'ระยะเวลารวมในการเทคอนกรีต', type:'duration', startFieldId:startT.id, endFieldId:endT.id},
+      {id:uid(), label:'เวลาที่ตัดลวดได้', type:'time'}
+    ]};
+  })()
 ]);
 
 function makeDefaultTemplates(){
@@ -133,12 +136,15 @@ function makeDefaultTemplates(){
           {id:uid(), label:'จำนวน', type:'number', unit:'เส้น'},
           {id:uid(), label:'ระยะยืด', type:'number', unit:'ซม.'}
         ]},
-        {id:uid(), title:'4. การเทคอนกรีต', fields:[
-          {id:uid(), label:'เวลาเริ่มเท', type:'time'},
-          {id:uid(), label:'เวลาเทเสร็จ', type:'time'},
-          {id:uid(), label:'เวลาตัดลวด', type:'time'},
-          {id:uid(), label:'ระยะเวลารวมในการเทคอนกรีต', type:'text'}
-        ]},
+        (()=>{
+          const startT = {id:uid(), label:'เวลาเริ่มเท', type:'time'};
+          const endT = {id:uid(), label:'เวลาเทเสร็จ', type:'time'};
+          return {id:uid(), title:'4. การเทคอนกรีต', fields:[
+            startT, endT,
+            {id:uid(), label:'ระยะเวลารวมในการเทคอนกรีต', type:'duration', startFieldId:startT.id, endFieldId:endT.id},
+            {id:uid(), label:'เวลาตัดลวด', type:'time'}
+          ]};
+        })(),
         {id:uid(), title:'5. ลักษณะทั่วไป และตราปั้มขนาด', fields:[
           {id:uid(), label:'ลักษณะทั่วไป', type:'pass'},
           {id:uid(), label:'ตราปั้มขนาด', type:'pass'}
@@ -174,11 +180,15 @@ function makeDefaultTemplates(){
           {id:uid(), label:'จำนวน', type:'number', unit:'เส้น'},
           {id:uid(), label:'ระยะยืด', type:'number', unit:'มม.'}
         ]},
-        {id:uid(), title:'3. การเทคอนกรีต', fields:[
-          {id:uid(), label:'เวลาเริ่ม-เสร็จ', type:'text'},
-          {id:uid(), label:'ระยะเวลารวมในการเทคอนกรีต', type:'text'},
-          {id:uid(), label:'เวลาที่ตัดลวดได้', type:'time'}
-        ]},
+        (()=>{
+          const startT = {id:uid(), label:'เวลาเริ่มเท', type:'time'};
+          const endT = {id:uid(), label:'เวลาเทเสร็จ', type:'time'};
+          return {id:uid(), title:'3. การเทคอนกรีต', fields:[
+            startT, endT,
+            {id:uid(), label:'ระยะเวลารวมในการเทคอนกรีต', type:'duration', startFieldId:startT.id, endFieldId:endT.id},
+            {id:uid(), label:'เวลาที่ตัดลวดได้', type:'time'}
+          ]};
+        })(),
         {id:uid(), title:'4. ลักษณะทั่วไป', fields:[
           {id:uid(), label:'รูพรุน', type:'pass'},
           {id:uid(), label:'ระยะรูกลวง', type:'pass'},
@@ -426,6 +436,29 @@ function fieldAnswerText(field, value){
   if (field.type === 'pass') return value === 'pass' ? 'ผ่าน' : (value === 'fail' ? 'ไม่ผ่าน' : '-');
   if (field.type === 'number') return `${value}${field.unit ? ' '+field.unit : ''}`;
   return String(value);
+}
+
+/* ---------------- auto duration (start/end time -> elapsed) ---------------- */
+function computeDurationText(piece, field){
+  const start = piece.values[field.startFieldId];
+  const end = piece.values[field.endFieldId];
+  if (!start || !end) return '';
+  const [sh,sm] = start.split(':').map(Number);
+  const [eh,em] = end.split(':').map(Number);
+  if ([sh,sm,eh,em].some(n=>Number.isNaN(n))) return '';
+  let mins = (eh*60+em) - (sh*60+sm);
+  if (mins < 0) mins += 24*60;
+  const hh = Math.floor(mins/60), mm = mins%60;
+  return hh>0 ? `${hh} ชม. ${mm} นาที` : `${mm} นาที`;
+}
+function syncDurationFields(tpl, piece){
+  tpl.sections.forEach(sec=>sec.fields.forEach(f=>{
+    if (f.type !== 'duration') return;
+    const text = computeDurationText(piece, f);
+    piece.values[f.id] = text || undefined;
+    const el = document.querySelector(`[data-duration-id="${f.id}"]`);
+    if (el) el.textContent = text || 'รอกรอกเวลาเริ่ม/เวลาเสร็จ';
+  }));
 }
 
 function pieceStats(template, piece){
@@ -781,6 +814,7 @@ VIEWS.newPiece = function({pieceId}){
   if (!tpl || !piece){ back(); return h('div'); }
   state.chrome.title = piece.name;
   state.chrome.subtitle = tpl.name;
+  syncDurationFields(tpl, piece);
 
   const wrap = h('div', {});
   const openSet = new Set([tpl.sections[0] && tpl.sections[0].id]);
@@ -881,7 +915,9 @@ function renderFieldControl(tpl, piece, field){
     );
     item.appendChild(sel);
   } else if (field.type === 'time'){
-    item.appendChild(h('input', {type:'time', value:piece.values[field.id]||'', onchange:(e)=>{ piece.values[field.id]=e.target.value||undefined; DB.saveDraft(DB.draft()); }}));
+    item.appendChild(h('input', {type:'time', value:piece.values[field.id]||'', onchange:(e)=>{ piece.values[field.id]=e.target.value||undefined; syncDurationFields(tpl, piece); DB.saveDraft(DB.draft()); }}));
+  } else if (field.type === 'duration'){
+    item.appendChild(h('div', {class:'duration-box', 'data-duration-id':field.id}, computeDurationText(piece, field) || 'รอกรอกเวลาเริ่ม/เวลาเสร็จ'));
   } else if (field.type === 'number'){
     item.appendChild(h('input', {type:'number', inputmode:'decimal', placeholder:'ระบุค่า', value: piece.values[field.id]??'', oninput: debounce((e)=>{ piece.values[field.id]=e.target.value===''?undefined:e.target.value; DB.saveDraft(DB.draft()); },250)}));
   } else {
@@ -1544,7 +1580,7 @@ VIEWS.templateEditor = function({id}){
   return wrap;
 };
 function fieldTypeLabel(f){
-  const map = {pass:'ผ่าน/ไม่ผ่าน', text:'ข้อความ', number:`ตัวเลข${f.unit?' ('+f.unit+')':''}`, time:'เวลา', select:'ตัวเลือก', note:'บันทึกข้อความยาว'};
+  const map = {pass:'ผ่าน/ไม่ผ่าน', text:'ข้อความ', number:`ตัวเลข${f.unit?' ('+f.unit+')':''}`, time:'เวลา', select:'ตัวเลือก', note:'บันทึกข้อความยาว', duration:'ระยะเวลา (คำนวณอัตโนมัติ)'};
   return map[f.type]||f.type;
 }
 function openFieldEditModal(tpl, sec, field, onSave){
@@ -1552,32 +1588,54 @@ function openFieldEditModal(tpl, sec, field, onSave){
   const draftField = field ? {...field} : {id:uid(), label:'', type:'pass', unit:'', options:[]};
   const labelInput = h('input', {type:'text', value:draftField.label, placeholder:'เช่น ความสะอาดแบบหล่อ'});
   const typeSelect = h('select', {},
-    ...[['pass','ผ่าน/ไม่ผ่าน'],['number','ตัวเลข'],['text','ข้อความสั้น'],['time','เวลา'],['select','ตัวเลือก (dropdown)'],['note','บันทึกข้อความยาว']]
+    ...[['pass','ผ่าน/ไม่ผ่าน'],['number','ตัวเลข'],['text','ข้อความสั้น'],['time','เวลา'],['duration','ระยะเวลา (คำนวณจากเวลาเริ่ม-เสร็จอัตโนมัติ)'],['select','ตัวเลือก (dropdown)'],['note','บันทึกข้อความยาว']]
       .map(([v,l])=>h('option',{value:v, selected:draftField.type===v}, l))
   );
   const unitInput = h('input', {type:'text', value:draftField.unit||'', placeholder:'เช่น ซม., มม., เส้น'});
   const optionsArea = h('textarea', {placeholder:'บรรทัดละ 1 ตัวเลือก'}, (draftField.options||[]).join('\n'));
   const unitField = h('div', {class:'field', style:{display: draftField.type==='number'?'block':'none'}}, h('label',{},'หน่วย'), unitInput);
   const optField = h('div', {class:'field', style:{display: draftField.type==='select'?'block':'none'}}, h('label',{},'ตัวเลือก'), optionsArea);
+
+  const timeFields = sec.fields.filter(f=>f.type==='time' && f.id!==draftField.id);
+  const startSelect = h('select', {},
+    h('option',{value:''},'— เลือกรายการเวลาเริ่ม —'),
+    ...timeFields.map(f=>h('option',{value:f.id, selected:draftField.startFieldId===f.id}, f.label))
+  );
+  const endSelect = h('select', {},
+    h('option',{value:''},'— เลือกรายการเวลาสิ้นสุด —'),
+    ...timeFields.map(f=>h('option',{value:f.id, selected:draftField.endFieldId===f.id}, f.label))
+  );
+  const durationField = h('div', {class:'field', style:{display: draftField.type==='duration'?'block':'none'}},
+    timeFields.length >= 2
+      ? h('div', {},
+          h('label',{},'คำนวณจากเวลาเริ่ม'), startSelect,
+          h('label',{style:{marginTop:'8px'}},'ถึงเวลาสิ้นสุด'), endSelect
+        )
+      : h('div', {class:'hint'}, 'ต้องมีรายการตรวจประเภท "เวลา" อย่างน้อย 2 รายการในหมวดนี้ก่อน จึงจะเลือกคำนวณระยะเวลาได้')
+  );
+
   typeSelect.addEventListener('change', ()=>{
     unitField.style.display = typeSelect.value==='number' ? 'block':'none';
     optField.style.display = typeSelect.value==='select' ? 'block':'none';
+    durationField.style.display = typeSelect.value==='duration' ? 'block':'none';
   });
 
   openModal(h('div', {},
     h('div', {class:'modal-title'}, isNew ? 'เพิ่มรายการตรวจ' : 'แก้ไขรายการตรวจ'),
     h('div', {class:'field'}, h('label',{},'ชื่อรายการตรวจ'), labelInput),
     h('div', {class:'field'}, h('label',{},'รูปแบบการตอบ'), typeSelect),
-    unitField, optField,
+    unitField, optField, durationField,
     h('div', {class:'btn-row'},
       h('button', {class:'btn secondary', onclick:closeModal}, 'ยกเลิก'),
       h('button', {class:'btn', onclick:()=>{
         const label = labelInput.value.trim();
         if (!label){ toast('กรุณาระบุชื่อรายการ','err'); return; }
+        if (typeSelect.value==='duration' && (!startSelect.value || !endSelect.value)){ toast('กรุณาเลือกรายการเวลาเริ่มและเวลาสิ้นสุด','err'); return; }
         draftField.label = label;
         draftField.type = typeSelect.value;
         draftField.unit = unitInput.value.trim();
         draftField.options = optionsArea.value.split('\n').map(s=>s.trim()).filter(Boolean);
+        if (typeSelect.value==='duration'){ draftField.startFieldId = startSelect.value; draftField.endFieldId = endSelect.value; }
         if (isNew) sec.fields.push(draftField);
         else Object.assign(field, draftField);
         onSave();
