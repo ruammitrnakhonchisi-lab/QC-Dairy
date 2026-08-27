@@ -6,12 +6,12 @@
    secret keys; access is controlled by Firestore Security Rules.
    ============================================================ */
 const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.appspot.com",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME"
+  apiKey: "AIzaSyDvBB818m8y5ccQxBI2JgBlCoQ_1fjDSUc",
+  authDomain: "qc-dairy.firebaseapp.com",
+  projectId: "qc-dairy",
+  storageBucket: "qc-dairy.firebasestorage.app",
+  messagingSenderId: "641509099684",
+  appId: "1:641509099684:web:c7a6131bf5a22d5c9b3e31"
 };
 
 const FIREBASE_CONFIGURED = firebaseConfig.apiKey !== "REPLACE_ME";
