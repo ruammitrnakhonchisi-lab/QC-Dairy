@@ -1821,31 +1821,65 @@ function clearOldPhotos(){
 /* ============================================================
    BOOT
    ============================================================ */
+/* ---------------- dynamic, non-blocking script loading ---------------- */
+// Some networks (factory/office WiFi with a restrictive firewall) block
+// Google/Firebase domains outright. If those scripts were loaded as normal
+// blocking <script> tags, a silently-dropped connection could stall page
+// load for a very long time — the whole app would never appear. Instead we
+// load them dynamically, in the background, well after the app has already
+// rendered from local data, each with its own short timeout.
+function loadScriptOnce(src, timeoutMs){
+  return new Promise((resolve, reject)=>{
+    let done = false;
+    const timer = setTimeout(()=>{ if (!done){ done=true; reject(new Error('timeout: '+src)); } }, timeoutMs);
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = ()=>{ if (!done){ done=true; clearTimeout(timer); resolve(); } };
+    s.onerror = ()=>{ if (!done){ done=true; clearTimeout(timer); reject(new Error('failed to load: '+src)); } };
+    document.head.appendChild(s);
+  });
+}
+async function tryLoadFirebase(){
+  try{
+    await loadScriptOnce('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js', 7000);
+    await loadScriptOnce('https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js', 7000);
+    await loadScriptOnce('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js', 7000);
+    await loadScriptOnce('firebase-config.js', 4000);
+    return typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED;
+  }catch(err){
+    console.warn('Firebase SDK unavailable (network may be blocking Google/Firebase domains) — staying in offline/local mode:', err.message);
+    return false;
+  }
+}
+
 async function boot(){
   applyTheme();
   qs('#btnBack').addEventListener('click', back);
   qsa('.tab-item').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
 
-  if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){
-    qs('#syncOverlay').hidden = false;
-    updateSyncBadge();
-    window.addEventListener('online', updateSyncBadge);
-    window.addEventListener('offline', updateSyncBadge);
-    try{
-      // Hard outer cap in addition to initCloudSync's own internal timeout —
-      // guarantees the app never gets stuck on the loading screen.
-      await Promise.race([initCloudSync(), new Promise(r=>setTimeout(r, 9000))]);
-    }catch(err){
-      console.error('boot: cloud sync failed', err);
-    }
-    qs('#syncOverlay').hidden = true;
-  } else {
-    ensureSeedLocal();
-  }
-
+  // Always have usable data and a rendered app immediately — never block
+  // the first paint on a network-dependent cloud connection.
+  ensureSeedLocal();
   render();
+
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
+
+  // Cloud sync is a progressive enhancement, attached in the background.
+  // If it connects, DB.* transparently switches from localStorage to
+  // Firestore on the next call — no reload needed. If it can't connect
+  // (blocked network, offline), the app keeps working locally, silently.
+  const ok = await tryLoadFirebase();
+  if (!ok) return;
+  updateSyncBadge();
+  window.addEventListener('online', updateSyncBadge);
+  window.addEventListener('offline', updateSyncBadge);
+  try{
+    await Promise.race([initCloudSync(), new Promise(r=>setTimeout(r, 9000))]);
+  }catch(err){
+    console.error('boot: cloud sync failed', err);
+  }
+  render();
 }
 document.addEventListener('DOMContentLoaded', boot);
