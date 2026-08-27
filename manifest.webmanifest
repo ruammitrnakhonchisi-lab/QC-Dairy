@@ -1,0 +1,17 @@
+{
+  "name": "QC Precast — ระบบตรวจสอบคุณภาพ",
+  "short_name": "QC Precast",
+  "description": "แอปตรวจสอบคุณภาพผลิตภัณฑ์คอนกรีตสำเร็จรูป ระหว่างผลิตและหลังผลิต",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f2f4f3",
+  "theme_color": "#0f6e4f",
+  "lang": "th",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
