@@ -1404,8 +1404,10 @@ VIEWS.dailyReport = function({date}){
   if (!groups.length){
     wrap.appendChild(h('div', {class:'card empty'}, h('span',{class:'ic'},'📭'), 'ไม่มีข้อมูลการตรวจในวันที่นี้'));
   } else {
+    const printGrid = h('div', {class:'report-print-grid'});
     groups.forEach(g=>{
-      wrap.appendChild(h('div', {class:'section-title'}, `${g.template.icon || ''} ${g.template.name}`));
+      const group = h('div', {class:'report-group'});
+      group.appendChild(h('div', {class:'section-title report-group-title'}, `${g.template.icon || ''} ${g.template.name}`));
       const tableCard = h('div', {class:'card', style:{overflowX:'auto', padding:'10px'}});
       const tbody = h('tbody', {}, g.rows.map((row, i)=>
         h('tr', {class: row.status==='fail' ? 'row-fail' : ''},
@@ -1421,8 +1423,10 @@ VIEWS.dailyReport = function({date}){
         h('thead', {}, h('tr', {}, h('th',{},'#'), h('th',{},'ชิ้นงาน'), h('th',{},'ผู้ตรวจสอบ'), h('th',{},'เวลา'), h('th',{},'ผล'), h('th',{},'หมายเหตุ'))),
         tbody
       ));
-      wrap.appendChild(tableCard);
+      group.appendChild(tableCard);
+      printGrid.appendChild(group);
     });
+    wrap.appendChild(printGrid);
   }
 
   const inspectorNames = [...new Set(allRows.map(r=>r.inspector).filter(Boolean))];

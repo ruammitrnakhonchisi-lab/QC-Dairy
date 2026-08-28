@@ -344,6 +344,7 @@ canvas.sig-pad{width:100%; height:160px; display:block; touch-action:none; backg
 .report-table td:last-child, .report-table th:last-child{white-space:normal;}
 .report-table th{background:var(--surface-2); font-weight:700;}
 .report-table tr.row-fail td{color:var(--danger);}
+.report-group{margin-bottom:4px;}
 .sig-line{margin:16px 0 6px; font-size:13.5px;}
 .sig-line .rule{border-bottom:1px dashed var(--border); height:34px; max-width:280px;}
 .sig-line .rule img{max-height:60px;}
@@ -360,13 +361,30 @@ canvas.sig-pad{width:100%; height:160px; display:block; touch-action:none; backg
 
 /* Print styles for report export */
 @media print{
+  @page{ size: A4 portrait; margin: 10mm; }
   .tabbar, .topbar, .toast-root{display:none !important;}
   .view{padding:0; max-width:100%;}
-  body{background:#fff;}
-  .card{box-shadow:none; border:1px solid #ccc; page-break-inside:avoid;}
+  body{background:#fff; font-size:11px;}
+  .card{box-shadow:none; border:1px solid #ccc; page-break-inside:avoid; padding:6px !important; margin-bottom:6px;}
+  .card-title{font-size:10px; margin-bottom:4px;}
   .report-table{font-size:11px;}
   .report-table th, .report-table td{border-color:#999;}
   .section-title{page-break-after:avoid;}
+
+  /* Daily report: pack each product's table densely, two per row, to fit
+     the whole day's report onto a single A4 sheet like the old paper form. */
+  .report-print-grid{display:grid; grid-template-columns:1fr 1fr; gap:0 10px; align-items:start;}
+  .report-group{break-inside:avoid; page-break-inside:avoid; margin-bottom:4px;}
+  .report-group-title{font-size:10.5px; margin:4px 0 2px; font-weight:700;}
+  .report-print-grid .card{padding:0 !important; border:none; margin-bottom:0;}
+  .report-print-grid .report-table{font-size:8px; width:100%;}
+  .report-print-grid .report-table th, .report-print-grid .report-table td{padding:1.5px 3px; border-color:#999;}
+  .summary-row{gap:8px;}
+  .donut{transform:scale(.65); transform-origin:left center; margin-right:-24px;}
+  .summary-legend{font-size:10px;}
+  .sig-line{margin:6px 0 2px; font-size:10px;}
+  .sig-line .rule{height:18px; max-width:160px;}
+  .sig-line .rule img{max-height:34px;}
 }
 .print-only{display:none;}
 @media print{.print-only{display:block;} .no-print{display:none !important;}}
