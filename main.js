@@ -514,7 +514,9 @@ function goCrossTab(tab, view, params){
 
 const VIEWS = {}; // filled below
 
+let _renderGen = 0;
 function render(){
+  const myGen = ++_renderGen;
   const stack = currentStack();
   const entry = stack[stack.length-1];
   state.chrome = {title:'QC Precast', subtitle:'', menu:null};
@@ -525,6 +527,12 @@ function render(){
     console.error(e);
     node = h('div', {class:'empty'}, h('span',{class:'ic'},'⚠️'), 'เกิดข้อผิดพลาดในการแสดงผล');
   }
+  // A view's own guard clause (e.g. "if (!draft) { switchTab('home'); return; }")
+  // can call go()/back()/switchTab() while THIS call is still building `node`.
+  // That nested call already ran its own render() and painted the correct
+  // screen; if we kept going we'd overwrite it with this call's now-stale,
+  // often-blank `node`. Bail out whenever a newer render() has since run.
+  if (myGen !== _renderGen) return;
   const viewEl = qs('#view');
   viewEl.replaceChildren(node);
   qs('#topbarTitle').textContent = state.chrome.title;
