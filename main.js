@@ -574,9 +574,13 @@ function statusChip(status){
 function reportTypeLabel(t){ return t === 'inprocess' ? 'ระหว่างผลิต' : 'หลังผลิต'; }
 function reportTypeChip(t){ return h('span',{class:'chip brand'}, reportTypeLabel(t)); }
 
-function fieldAnswerText(field, value){
+function fieldAnswerText(field, value, compact){
   if (value == null || value === '') return '-';
-  if (field.type === 'pass') return value === 'pass' ? 'ผ่าน' : (value === 'fail' ? 'ไม่ผ่าน' : '-');
+  if (field.type === 'pass'){
+    if (value === 'pass') return compact ? '✓' : 'ผ่าน';
+    if (value === 'fail') return compact ? '✗' : 'ไม่ผ่าน';
+    return '-';
+  }
   if (field.type === 'number') return `${value}${field.unit ? ' '+field.unit : ''}`;
   return String(value);
 }
@@ -1471,20 +1475,38 @@ function dailyGroups(date){
 }
 function statusRowText(st){ return st==='fail' ? '✗ ไม่ผ่าน' : st==='pending' ? '◐ ไม่ครบ' : '✓ ผ่าน'; }
 
+function detailedColWeight(field){
+  // Pass/fail cells only ever hold a single ✓/✗ glyph, so they can stay
+  // narrow; text-ish or longer-value columns get more room.
+  if (field.type === 'pass') return 3;
+  if (field.type === 'time') return 3.5;
+  if (field.type === 'select') return 4;
+  if (field.type === 'duration' || field.type === 'number') return 4.5;
+  return 6; // text / anything else
+}
+
 function buildDetailedProductSheet(group, date, pageBreakBefore){
   const tpl = group.template;
   const headRow1 = [h('th',{rowspan:'2'},'#'), h('th',{rowspan:'2'},'ชิ้นงาน')];
   const headRow2 = [];
+  const fieldWeights = [];
   tpl.sections.forEach(sec=>{
     headRow1.push(h('th',{colspan:String(sec.fields.length)}, sec.title));
-    sec.fields.forEach(f=>headRow2.push(h('th',{}, f.label + (f.unit ? ` (${f.unit})` : ''))));
+    sec.fields.forEach(f=>{
+      headRow2.push(h('th',{}, f.label + (f.unit ? ` (${f.unit})` : '')));
+      fieldWeights.push(detailedColWeight(f));
+    });
   });
   headRow1.push(h('th',{rowspan:'2'},'ผู้ตรวจสอบ'), h('th',{rowspan:'2'},'เวลา'), h('th',{rowspan:'2'},'หมายเหตุ'));
+
+  const colWeights = [2, 11, ...fieldWeights, 8, 4, 13];
+  const totalWeight = colWeights.reduce((a,b)=>a+b, 0);
+  const colgroup = h('colgroup', {}, colWeights.map(w=>h('col', {style:{width:(w/totalWeight*100).toFixed(2)+'%'}})));
 
   const tbody = h('tbody', {}, group.rows.map((row, i)=>{
     const cells = [h('td',{}, i+1), h('td',{}, row.piece.name)];
     tpl.sections.forEach(sec=>sec.fields.forEach(f=>{
-      cells.push(h('td',{}, fieldAnswerText(f, row.piece.values[f.id])));
+      cells.push(h('td',{class: f.type==='pass' ? 'col-pass':''}, fieldAnswerText(f, row.piece.values[f.id], true)));
     }));
     cells.push(
       h('td',{}, row.inspector),
@@ -1494,14 +1516,27 @@ function buildDetailedProductSheet(group, date, pageBreakBefore){
     return h('tr', {class: row.status==='fail' ? 'row-fail' : ''}, cells);
   }));
 
+  const inspectorNames = [...new Set(group.rows.map(r=>r.inspector).filter(Boolean))];
+  const sigByName = {};
+  group.rows.forEach(r=>{ if (r.signature && !sigByName[r.inspector]) sigByName[r.inspector] = r.signature; });
+
   return h('div', {class:'detailed-sheet'+(pageBreakBefore ? ' sheet-break' : '')},
     h('div', {class:'detailed-sheet-header'},
       h('div', {class:'detailed-sheet-title'}, `${tpl.icon || ''} ${tpl.name}`),
       h('div', {class:'detailed-sheet-sub'}, `${tpl.line || ''} • วันที่ผลิต ${fmtDateTH(date)}`)
     ),
     h('table', {class:'report-table detailed-report-table'},
+      colgroup,
       h('thead', {}, h('tr', {}, headRow1), h('tr', {}, headRow2)),
       tbody
+    ),
+    h('div', {class:'detailed-sheet-sig'},
+      inspectorNames.length
+        ? inspectorNames.map(name=>h('div', {class:'sig-line'},
+            h('div', {class:'rule'}, sigByName[name] ? h('img',{src:sigByName[name]}) : null),
+            h('div', {class:'cap'}, `ผู้ตรวจสอบคุณภาพ (${name})`)
+          ))
+        : null
     )
   );
 }
@@ -1586,8 +1621,8 @@ VIEWS.dailyReport = function({date}){
   const inspectorNames = [...new Set(allRows.map(r=>r.inspector).filter(Boolean))];
   const sigByName = {};
   allRows.forEach(r=>{ if (r.signature && !sigByName[r.inspector]) sigByName[r.inspector] = r.signature; });
-  wrap.appendChild(h('div', {class:'card'},
-    h('div', {class:'card-title'}, 'ลงชื่อรับรองผลการตรวจประจำวัน'),
+  wrap.appendChild(h('div', {class:'card no-print'},
+    h('div', {class:'card-title'}, 'ลงชื่อรับรองผลการตรวจประจำวัน (สรุปทั้งวัน — ดูในแอปเท่านั้น เพราะตอนพิมพ์แต่ละหน้ามีลายเซ็นของตัวเองแล้ว)'),
     inspectorNames.length
       ? inspectorNames.map(name=>h('div', {class:'sig-line'},
           h('div', {class:'rule'}, sigByName[name] ? h('img',{src:sigByName[name]}) : null),
