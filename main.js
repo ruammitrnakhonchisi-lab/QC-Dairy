@@ -24,6 +24,13 @@ function h(tag, attrs, ...children){
       el.setAttribute('role', 'button');
       el.setAttribute('tabindex', '0');
       el.addEventListener('keydown', (e)=>{
+        // Only activate on Enter/Space when the div itself (or a plain,
+        // non-form descendant) has focus. Otherwise a Enter/Space pressed
+        // inside a nested input/textarea/select — e.g. to add a newline in
+        // a textarea — would bubble up and wrongly "click" this wrapper
+        // (for a modal backdrop, that means the whole modal closes).
+        const t = e.target.tagName;
+        if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
         if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); el.click(); }
       });
     }
@@ -418,7 +425,7 @@ function toast(msg, kind){
 function openModal(node, {center=false} = {}){
   const root = qs('#modalRoot');
   root.innerHTML = '';
-  const overlay = h('div', {class:'modal-overlay'+(center?' center':''), onclick:(e)=>{ if (e.target===overlay) closeModal(); }},
+  const overlay = h('div', {class:'modal-overlay'+(center?' center':''), role:'presentation', onclick:(e)=>{ if (e.target===overlay) closeModal(); }},
     h('div', {class:'modal-sheet'}, node)
   );
   root.appendChild(overlay);
