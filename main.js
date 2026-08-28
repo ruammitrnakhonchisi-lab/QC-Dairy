@@ -933,6 +933,17 @@ VIEWS.newPiece = function({pieceId}){
     });
   }
   buildSections();
+
+  const passAllCount = tpl.sections.reduce((a,sec)=>a+sec.fields.filter(f=>f.type==='pass').length, 0);
+  if (passAllCount > 0){
+    wrap.appendChild(h('button', {class:'btn secondary', style:{marginBottom:'12px'}, onclick:()=>{
+      tpl.sections.forEach(sec=>sec.fields.forEach(f=>{ if (f.type==='pass') piece.values[f.id]='pass'; }));
+      DB.saveDraft(draft);
+      buildSections();
+      toast('ตั้งค่าผ่านทั้งหมดแล้ว — แก้เฉพาะรายการที่ไม่ผ่านได้เลย','ok');
+    }}, `✓ ผ่านทั้งหมด (${passAllCount} รายการ)`));
+  }
+
   wrap.appendChild(listEl);
 
   wrap.appendChild(h('div', {class:'section-title'}, 'หมายเหตุชิ้นงานนี้'));
