@@ -363,16 +363,30 @@ function updateSyncBadge(){
 }
 
 /* ---------------- data access ---------------- */
+// Firestore rejects any field whose value is literally `undefined` (throws
+// synchronously on .set()), but this app assigns `undefined` freely to mean
+// "cleared/unanswered" (e.g. untoggling a pass/fail button). That was always
+// harmless for localStorage, since JSON.stringify silently drops undefined
+// keys — but the same object handed straight to Firestore's SDK is not
+// JSON-serialized first, so those keys survive and the write throws. Route
+// every cloud write through a JSON round-trip to strip them, matching the
+// behavior localStorage already had.
+function stripUndefinedForCloud(obj){ return JSON.parse(JSON.stringify(obj)); }
+
 const DB = {
   employees(){ return (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) ? (CLOUD._employees||[]) : load(KEYS.employees, []); },
   saveEmployees(v){
-    if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){ CLOUD._employees = v; cloudDocRef('employees').set({list:v}).catch(cloudErr); }
-    else save(KEYS.employees, v);
+    if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){
+      CLOUD._employees = v;
+      try{ cloudDocRef('employees').set({list: stripUndefinedForCloud(v)}).catch(cloudErr); }catch(err){ cloudErr(err); }
+    } else save(KEYS.employees, v);
   },
   templates(){ return (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) ? (CLOUD._templates||[]) : load(KEYS.templates, []); },
   saveTemplates(v){
-    if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){ CLOUD._templates = v; cloudDocRef('templates').set({list:v}).catch(cloudErr); }
-    else save(KEYS.templates, v);
+    if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){
+      CLOUD._templates = v;
+      try{ cloudDocRef('templates').set({list: stripUndefinedForCloud(v)}).catch(cloudErr); }catch(err){ cloudErr(err); }
+    } else save(KEYS.templates, v);
   },
   template(id){ return this.templates().find(t=>t.id===id); },
   records(){ return (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) ? (CLOUD._records||[]) : load(KEYS.records, []); },
@@ -380,11 +394,13 @@ const DB = {
     if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED){
       const oldIds = new Set((CLOUD._records||[]).map(r=>r.id));
       const newIds = new Set(v.map(r=>r.id));
-      const batch = firebase.firestore().batch();
-      v.forEach(r=>batch.set(cloudCol('records').doc(r.id), r));
-      oldIds.forEach(id=>{ if (!newIds.has(id)) batch.delete(cloudCol('records').doc(id)); });
       CLOUD._records = v;
-      batch.commit().catch(cloudErr);
+      try{
+        const batch = firebase.firestore().batch();
+        v.forEach(r=>batch.set(cloudCol('records').doc(r.id), stripUndefinedForCloud(r)));
+        oldIds.forEach(id=>{ if (!newIds.has(id)) batch.delete(cloudCol('records').doc(id)); });
+        batch.commit().catch(cloudErr);
+      }catch(err){ cloudErr(err); }
     } else save(KEYS.records, v);
   },
   record(id){ return this.records().find(r=>r.id===id); },
