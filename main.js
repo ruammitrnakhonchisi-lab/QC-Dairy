@@ -691,12 +691,14 @@ VIEWS.home = function(){
     const card = h('div', {class:'card'});
     recent.forEach(r=>{
       const tpl = DB.template(r.templateId) || r.templateSnapshot;
+      const st = recordStatus(r);
       card.appendChild(h('div', {class:'list-row', onclick:()=>goCrossTab('history','historyDetail',{id:r.id}), style:{cursor:'pointer'}},
         h('div', {class:'main'},
           h('b',{}, tpl ? tpl.name : 'ไม่พบแบบฟอร์ม'),
           h('small',{}, `${fmtDateTH(r.productionDate)} • ${r.inspectorName} • ${r.pieces.length} ชิ้น`)
         ),
-        statusChip(recordStatus(r))
+        st==='pending' && DB.template(r.templateId) ? h('button', {class:'btn sm', style:{flex:'none'}, onclick:(e)=>{ e.stopPropagation(); resumeRecordForCompletion(r); }}, 'เข้าตรวจเพิ่มเติม') : null,
+        statusChip(st)
       ));
     });
     wrap.appendChild(card);
@@ -854,6 +856,12 @@ VIEWS.newBuilder = function(){
   state.chrome.menu = {icon:'✎', action:()=>go('newSetup', {templateId: tpl.id})};
 
   const wrap = h('div', {});
+
+  if (draft.editingRecordId){
+    wrap.appendChild(h('div', {class:'card', style:{borderLeft:'4px solid var(--brand)', background:'var(--brand-light)'}},
+      '📝 กำลังเข้าตรวจเพิ่มเติมรายการเดิม — บันทึกจะอัปเดตรายการนี้ ไม่สร้างใหม่'
+    ));
+  }
 
   wrap.appendChild(h('div', {class:'card'},
     h('div', {class:'card-title'}, 'ข้อมูลรอบตรวจ'),
@@ -1097,7 +1105,7 @@ VIEWS.newFinish = function(){
     buildSignaturePad(draft)
   ));
 
-  wrap.appendChild(h('button', {class:'btn', onclick:()=>saveFinalRecord(draft, tpl)}, '✓ บันทึกผลการตรวจ'));
+  wrap.appendChild(h('button', {class:'btn', onclick:()=>saveFinalRecord(draft, tpl)}, draft.editingRecordId ? '✓ บันทึกการตรวจเพิ่มเติม' : '✓ บันทึกผลการตรวจ'));
   return wrap;
 };
 
@@ -1146,8 +1154,11 @@ function buildSignaturePad(draft){
 }
 
 function saveFinalRecord(draft, tpl){
+  const list = DB.records();
+  const editingIdx = draft.editingRecordId ? list.findIndex(r=>r.id===draft.editingRecordId) : -1;
+
   const record = {
-    id: uid(),
+    id: editingIdx>=0 ? draft.editingRecordId : uid(),
     templateId: tpl.id,
     templateSnapshot: JSON.parse(JSON.stringify(tpl)),
     reportType: draft.reportType,
@@ -1158,12 +1169,43 @@ function saveFinalRecord(draft, tpl){
     note: draft.note,
     signature: draft.signature || null,
     pieces: draft.pieces,
-    createdAt: Date.now()
+    createdAt: editingIdx>=0 ? list[editingIdx].createdAt : Date.now(),
+    updatedAt: editingIdx>=0 ? Date.now() : undefined
   };
-  const list = DB.records(); list.push(record); DB.saveRecords(list);
+
+  if (editingIdx>=0) list[editingIdx] = record; else list.push(record);
+  DB.saveRecords(list);
   DB.clearDraft();
-  toast('บันทึกผลการตรวจสำเร็จ', 'ok');
+  toast(editingIdx>=0 ? 'บันทึกการตรวจเพิ่มเติมสำเร็จ' : 'บันทึกผลการตรวจสำเร็จ', 'ok');
   goCrossTab('history', 'historyDetail', {id: record.id});
+}
+
+function resumeRecordForCompletion(record){
+  const startResume = ()=>{
+    const draft = {
+      templateId: record.templateId,
+      reportType: record.reportType,
+      productionDate: record.productionDate,
+      testDate: record.testDate,
+      inspectorId: record.inspectorId,
+      inspectorName: record.inspectorName,
+      note: record.note || '',
+      signature: record.signature || null,
+      pieces: JSON.parse(JSON.stringify(record.pieces)),
+      editingRecordId: record.id
+    };
+    DB.saveDraft(draft);
+    toast('กำลังเข้าตรวจเพิ่มเติม — กรอกรายการที่เหลือแล้วบันทึกได้เลย','ok');
+    goCrossTab('new', 'newBuilder', {});
+  };
+  if (DB.draft()){
+    confirmDialog('มีงานตรวจค้างอยู่','การเข้าตรวจเพิ่มเติมรายการนี้จะลบงานตรวจที่ค้างอยู่ก่อนหน้า ต้องการดำเนินการต่อหรือไม่?', ()=>{
+      DB.clearDraft();
+      startResume();
+    });
+  } else {
+    startResume();
+  }
 }
 
 /* ============================================================
@@ -1224,12 +1266,14 @@ VIEWS.historyList = function(){
     const card = h('div', {class:'card'});
     records.forEach(r=>{
       const tpl = DB.template(r.templateId) || r.templateSnapshot;
+      const st = recordStatus(r);
       card.appendChild(h('div', {class:'list-row', onclick:()=>go('historyDetail',{id:r.id}), style:{cursor:'pointer'}},
         h('div', {class:'main'},
           h('b',{}, tpl.name),
           h('small',{}, `${fmtDateTH(r.productionDate)} • ${r.inspectorName} • ${r.pieces.length} ชิ้น`)
         ),
-        statusChip(recordStatus(r))
+        st==='pending' && DB.template(r.templateId) ? h('button', {class:'btn sm', style:{flex:'none'}, onclick:(e)=>{ e.stopPropagation(); resumeRecordForCompletion(r); }}, 'เข้าตรวจเพิ่มเติม') : null,
+        statusChip(st)
       ));
     });
     listWrap.appendChild(card);
@@ -1259,6 +1303,10 @@ VIEWS.historyDetail = function({id}){
       )
     )
   ));
+
+  if (stats.pendingPieces > 0 && DB.template(record.templateId)){
+    wrap.appendChild(h('button', {class:'btn no-print', style:{marginBottom:'12px'}, onclick:()=>resumeRecordForCompletion(record)}, `📝 เข้าตรวจเพิ่มเติม (เหลือ ${stats.pendingPieces} ชิ้น)`));
+  }
 
   wrap.appendChild(h('div', {class:'card kv-list'},
     h('div',{class:'kv'}, h('b',{},'ประเภทการตรวจ'), reportTypeLabel(record.reportType)),
