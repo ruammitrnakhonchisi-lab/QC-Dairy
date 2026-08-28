@@ -310,23 +310,29 @@ function initCloudSync(){
         }
         try{
           db.collection('qc_meta').doc('templates').onSnapshot(snap=>{
-            CLOUD._templates = (snap.exists && snap.data().list) || [];
-            if (CLOUD._templates.length===0 && !snap.metadata.fromCache){ DB.saveTemplates(makeDefaultTemplates()); }
+            const next = (snap.exists && snap.data().list) || [];
+            const changed = JSON.stringify(next) !== JSON.stringify(CLOUD._templates);
+            CLOUD._templates = next;
+            if (next.length===0 && !snap.metadata.fromCache){ DB.saveTemplates(makeDefaultTemplates()); }
             if (!firstTpl){ firstTpl=true; bump(); }
-            render();
+            if (changed) safeRender();
           }, err=>{ cloudErr(err); if (!firstTpl){ firstTpl=true; bump(); } });
 
           db.collection('qc_meta').doc('employees').onSnapshot(snap=>{
-            CLOUD._employees = (snap.exists && snap.data().list) || [];
-            if (CLOUD._employees.length===0 && !snap.metadata.fromCache){ DB.saveEmployees(DEFAULT_EMPLOYEES); }
+            const next = (snap.exists && snap.data().list) || [];
+            const changed = JSON.stringify(next) !== JSON.stringify(CLOUD._employees);
+            CLOUD._employees = next;
+            if (next.length===0 && !snap.metadata.fromCache){ DB.saveEmployees(DEFAULT_EMPLOYEES); }
             if (!firstEmp){ firstEmp=true; bump(); }
-            render();
+            if (changed) safeRender();
           }, err=>{ cloudErr(err); if (!firstEmp){ firstEmp=true; bump(); } });
 
           db.collection('records').orderBy('createdAt','desc').onSnapshot(snap=>{
-            CLOUD._records = snap.docs.map(d=>d.data());
+            const next = snap.docs.map(d=>d.data());
+            const changed = JSON.stringify(next) !== JSON.stringify(CLOUD._records);
+            CLOUD._records = next;
             if (!firstRec){ firstRec=true; bump(); }
-            render();
+            if (changed) safeRender();
           }, err=>{ cloudErr(err); if (!firstRec){ firstRec=true; bump(); } });
         }catch(err){
           console.error('failed to attach Firestore listeners', err);
@@ -510,6 +516,20 @@ function render(){
   } else { menuBtn.hidden = true; menuBtn.onclick = null; }
   qsa('.tab-item').forEach(b=>b.classList.toggle('active', b.dataset.tab === state.tab));
   viewEl.scrollTop = 0;
+}
+// Like render(), but skips the rebuild if the user is actively typing in a
+// field on the current page — used for background sync updates, so an
+// incoming Firestore snapshot (including the echo of this device's own
+// just-made edit) never yanks focus out of an input mid-keystroke.
+function safeRender(){
+  const active = document.activeElement;
+  const viewEl = qs('#view');
+  const isTypingInView = active && viewEl && viewEl.contains(active) &&
+    (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+  const isTypingInModal = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+    qs('#modalRoot').contains(active);
+  if (isTypingInView || isTypingInModal) return;
+  render();
 }
 
 /* ============================================================
