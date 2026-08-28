@@ -1372,6 +1372,41 @@ function dailyGroups(date){
 }
 function statusRowText(st){ return st==='fail' ? '✗ ไม่ผ่าน' : st==='pending' ? '◐ ไม่ครบ' : '✓ ผ่าน'; }
 
+function buildDetailedProductSheet(group, date, pageBreakBefore){
+  const tpl = group.template;
+  const headRow1 = [h('th',{rowspan:'2'},'#'), h('th',{rowspan:'2'},'ชิ้นงาน')];
+  const headRow2 = [];
+  tpl.sections.forEach(sec=>{
+    headRow1.push(h('th',{colspan:String(sec.fields.length)}, sec.title));
+    sec.fields.forEach(f=>headRow2.push(h('th',{}, f.label + (f.unit ? ` (${f.unit})` : ''))));
+  });
+  headRow1.push(h('th',{rowspan:'2'},'ผู้ตรวจสอบ'), h('th',{rowspan:'2'},'เวลา'), h('th',{rowspan:'2'},'หมายเหตุ'));
+
+  const tbody = h('tbody', {}, group.rows.map((row, i)=>{
+    const cells = [h('td',{}, i+1), h('td',{}, row.piece.name)];
+    tpl.sections.forEach(sec=>sec.fields.forEach(f=>{
+      cells.push(h('td',{}, fieldAnswerText(f, row.piece.values[f.id])));
+    }));
+    cells.push(
+      h('td',{}, row.inspector),
+      h('td',{}, new Date(row.time).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})),
+      h('td',{}, row.note || '-')
+    );
+    return h('tr', {class: row.status==='fail' ? 'row-fail' : ''}, cells);
+  }));
+
+  return h('div', {class:'detailed-sheet'+(pageBreakBefore ? ' sheet-break' : '')},
+    h('div', {class:'detailed-sheet-header'},
+      h('div', {class:'detailed-sheet-title'}, `${tpl.icon || ''} ${tpl.name}`),
+      h('div', {class:'detailed-sheet-sub'}, `${tpl.line || ''} • วันที่ผลิต ${fmtDateTH(date)}`)
+    ),
+    h('table', {class:'report-table detailed-report-table'},
+      h('thead', {}, h('tr', {}, headRow1), h('tr', {}, headRow2)),
+      tbody
+    )
+  );
+}
+
 VIEWS.dailyReport = function({date}){
   const selDate = date || todayISO();
   state.chrome.title = 'รายงานประจำวัน';
@@ -1386,7 +1421,7 @@ VIEWS.dailyReport = function({date}){
     )
   ));
 
-  wrap.appendChild(h('div', {class:'print-only', style:{textAlign:'center', marginBottom:'16px'}},
+  wrap.appendChild(h('div', {class:'print-only report-cover-header', style:{textAlign:'center', marginBottom:'16px'}},
     h('div', {style:{fontSize:'18px', fontWeight:700}}, 'รายงานสรุปผลการตรวจสอบคุณภาพประจำวัน'),
     h('div', {style:{fontSize:'13px', color:'#555', marginTop:'2px'}}, fmtDateTH(selDate))
   ));
@@ -1398,7 +1433,7 @@ VIEWS.dailyReport = function({date}){
   const pending = allRows.filter(r=>r.status==='pending').length;
   const ok = total - fail - pending;
 
-  wrap.appendChild(h('div', {class:'card'},
+  wrap.appendChild(h('div', {class:'card report-cover'},
     h('div', {class:'card-title'}, 'ภาพรวมวันนี้'),
     h('div', {class:'summary-row'},
       donutSVG(ok, fail, pending),
@@ -1415,7 +1450,8 @@ VIEWS.dailyReport = function({date}){
   if (!groups.length){
     wrap.appendChild(h('div', {class:'card empty'}, h('span',{class:'ic'},'📭'), 'ไม่มีข้อมูลการตรวจในวันที่นี้'));
   } else {
-    const printGrid = h('div', {class:'report-print-grid'});
+    // On-screen: a quick condensed overview, one product per block.
+    const screenGrid = h('div', {class:'report-print-grid no-print'});
     groups.forEach(g=>{
       const group = h('div', {class:'report-group'});
       group.appendChild(h('div', {class:'section-title report-group-title'}, `${g.template.icon || ''} ${g.template.name}`));
@@ -1435,9 +1471,17 @@ VIEWS.dailyReport = function({date}){
         tbody
       ));
       group.appendChild(tableCard);
-      printGrid.appendChild(group);
+      screenGrid.appendChild(group);
     });
-    wrap.appendChild(printGrid);
+    wrap.appendChild(screenGrid);
+
+    // Print: one full-detail sheet per product — every checklist field as
+    // its own column, like the original Excel forms — on its own page.
+    const printDetail = h('div', {class:'print-only'});
+    groups.forEach((g, idx)=>{
+      printDetail.appendChild(buildDetailedProductSheet(g, selDate, idx>0));
+    });
+    wrap.appendChild(printDetail);
   }
 
   const inspectorNames = [...new Set(allRows.map(r=>r.inspector).filter(Boolean))];
