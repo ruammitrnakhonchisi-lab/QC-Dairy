@@ -1713,11 +1713,11 @@ VIEWS.templateEditor = function({id}){
 
   wrap.appendChild(h('div', {class:'card'},
     h('div', {class:'field'}, h('label',{},'ชื่อแบบฟอร์ม'),
-      h('input', {type:'text', value:t.name, onchange:(e)=>{ t.name=e.target.value.trim()||t.name; persist(); render(); }})),
+      h('input', {type:'text', value:t.name, oninput: debounce((e)=>{ t.name=e.target.value.trim()||t.name; persist(); safeRender(); },400)})),
     h('div', {class:'field'}, h('label',{},'สายการผลิต / คำอธิบาย'),
-      h('input', {type:'text', value:t.line||'', onchange:(e)=>{ t.line=e.target.value; persist(); }})),
+      h('input', {type:'text', value:t.line||'', oninput: debounce((e)=>{ t.line=e.target.value; persist(); },400)})),
     h('div', {class:'field'}, h('label',{},'คำนำหน้าเลขอัตโนมัติ (ถ้ามี เช่น "แผ่นพื้นสำเร็จ" จะได้ชื่อชิ้นงาน 1,2,3.. อัตโนมัติ)'),
-      h('input', {type:'text', value:t.autoNumberPrefix||'', placeholder:'เว้นว่างถ้าไม่ใช้', onchange:(e)=>{ t.autoNumberPrefix=e.target.value; persist(); }})),
+      h('input', {type:'text', value:t.autoNumberPrefix||'', placeholder:'เว้นว่างถ้าไม่ใช้', oninput: debounce((e)=>{ t.autoNumberPrefix=e.target.value; persist(); },400)})),
     h('div', {class:'field'}, h('label',{},'รายการชื่อชิ้นงานที่แนะนำ (บรรทัดละ 1 รายการ)'),
       h('textarea', {oninput: debounce((e)=>{ t.presetPieces=e.target.value.split('\n').map(s=>s.trim()).filter(Boolean); persist(); },300)}, (t.presetPieces||[]).join('\n')))
   ));
@@ -1726,7 +1726,7 @@ VIEWS.templateEditor = function({id}){
   t.sections.forEach((sec, secIdx)=>{
     const secCard = h('div', {class:'card'});
     secCard.appendChild(h('div', {style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px'}},
-      h('input', {type:'text', value:sec.title, style:{flex:1,fontWeight:700}, onchange:(e)=>{ sec.title=e.target.value.trim()||sec.title; persist(); }}),
+      h('input', {type:'text', value:sec.title, style:{flex:1,fontWeight:700}, oninput: debounce((e)=>{ sec.title=e.target.value.trim()||sec.title; persist(); },400)}),
       h('button', {class:'icon-sm', disabled:secIdx===0, onclick:()=>{ [t.sections[secIdx-1],t.sections[secIdx]]=[t.sections[secIdx],t.sections[secIdx-1]]; persist(); render(); }}, '↑'),
       h('button', {class:'icon-sm', disabled:secIdx===t.sections.length-1, onclick:()=>{ [t.sections[secIdx+1],t.sections[secIdx]]=[t.sections[secIdx],t.sections[secIdx+1]]; persist(); render(); }}, '↓'),
       h('button', {class:'icon-sm danger', onclick:()=>confirmDialog('ลบหมวดนี้', `ลบหมวด "${sec.title}" และรายการตรวจทั้งหมดในหมวดนี้?`, ()=>{ t.sections.splice(secIdx,1); persist(); render(); })}, '🗑')
