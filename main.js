@@ -1475,6 +1475,18 @@ function dailyGroups(date){
 }
 function statusRowText(st){ return st==='fail' ? '✗ ไม่ผ่าน' : st==='pending' ? '◐ ไม่ครบ' : '✓ ผ่าน'; }
 
+// A single consistent vector mark for every printed report page/header —
+// used instead of the per-template emoji so the printed document reads as
+// one professional, uniform document rather than a mix of emoji glyphs.
+function reportHeaderIconSVG(){
+  return '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<rect x="5" y="3" width="14" height="18" rx="2"></rect>'
+    + '<path d="M9 3v2h6V3"></path>'
+    + '<path d="M8.5 11l2 2 4-4.5"></path>'
+    + '<path d="M8.5 16l2 2 4-4.5"></path>'
+    + '</svg>';
+}
+
 function detailedColWeight(field){
   // Pass/fail cells only ever hold a single ✓/✗ glyph, so they can stay
   // narrow; text-ish or longer-value columns get more room.
@@ -1522,8 +1534,11 @@ function buildDetailedProductSheet(group, date, pageBreakBefore){
 
   return h('div', {class:'detailed-sheet'+(pageBreakBefore ? ' sheet-break' : '')},
     h('div', {class:'detailed-sheet-header'},
-      h('div', {class:'detailed-sheet-title'}, `${tpl.icon || ''} ${tpl.name}`),
-      h('div', {class:'detailed-sheet-sub'}, `${tpl.line || ''} • วันที่ผลิต ${fmtDateTH(date)}`)
+      h('span', {class:'report-icon', html: reportHeaderIconSVG()}),
+      h('div', {},
+        h('div', {class:'detailed-sheet-title'}, tpl.name),
+        h('div', {class:'detailed-sheet-sub'}, `${tpl.line || ''} • วันที่ผลิต ${fmtDateTH(date)}`)
+      )
     ),
     h('table', {class:'report-table detailed-report-table'},
       colgroup,
@@ -1555,9 +1570,18 @@ VIEWS.dailyReport = function({date}){
     )
   ));
 
-  wrap.appendChild(h('div', {class:'print-only report-cover-header', style:{textAlign:'center', marginBottom:'16px'}},
-    h('div', {style:{fontSize:'18px', fontWeight:700}}, 'รายงานสรุปผลการตรวจสอบคุณภาพประจำวัน'),
-    h('div', {style:{fontSize:'13px', color:'#555', marginTop:'2px'}}, fmtDateTH(selDate))
+  wrap.appendChild(h('div', {class:'print-only report-letterhead'},
+    h('div', {class:'report-letterhead-left'},
+      h('div', {class:'report-letterhead-logo'}, 'โลโก้', h('br'), 'บริษัท'),
+      h('div', {},
+        h('div', {class:'report-letterhead-coname'}, '[ชื่อบริษัท]'),
+        h('div', {class:'report-letterhead-conote'}, 'โรงงานผลิตคอนกรีตสำเร็จรูป')
+      )
+    ),
+    h('div', {class:'report-letterhead-right'},
+      h('div', {class:'report-letterhead-titletext'}, 'รายงานสรุปผลการตรวจสอบคุณภาพประจำวัน'),
+      h('div', {class:'report-letterhead-date'}, fmtDateTH(selDate))
+    )
   ));
 
   const groups = dailyGroups(selDate);
@@ -1580,6 +1604,26 @@ VIEWS.dailyReport = function({date}){
     h('div', {style:{marginTop:'10px', fontSize:'12.5px', color:'var(--text-dim)'}},
       `รวม ${groups.length} ผลิตภัณฑ์ • ${total} ชิ้นงาน${total ? ` • ${Math.round(ok/total*100)}% ผ่าน` : ''}`)
   ));
+
+  if (groups.length){
+    wrap.appendChild(h('div', {class:'print-only report-cover-summary'},
+      h('div', {class:'report-cover-summary-title'}, 'สรุปแยกตามผลิตภัณฑ์'),
+      h('table', {class:'report-cover-summary-table'},
+        h('thead', {}, h('tr', {}, h('th',{},'ผลิตภัณฑ์'), h('th',{},'จำนวนชิ้น'), h('th',{},'ผ่าน'), h('th',{},'ไม่ผ่าน'))),
+        h('tbody', {}, groups.map(g=>{
+          const gFail = g.rows.filter(r=>r.status==='fail').length;
+          const gPending = g.rows.filter(r=>r.status==='pending').length;
+          const gOk = g.rows.length - gFail - gPending;
+          return h('tr', {},
+            h('td', {}, g.template.name),
+            h('td', {}, g.rows.length),
+            h('td', {class:'ok'}, gOk),
+            h('td', {class:'fail'}, gFail)
+          );
+        }))
+      )
+    ));
+  }
 
   if (!groups.length){
     wrap.appendChild(h('div', {class:'card empty'}, h('span',{class:'ic'},'📭'), 'ไม่มีข้อมูลการตรวจในวันที่นี้'));

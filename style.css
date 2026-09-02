@@ -364,7 +364,7 @@ canvas.sig-pad{width:100%; height:160px; display:block; touch-action:none; backg
   @page{ size: A4 landscape; margin: 8mm; }
   .tabbar, .topbar, .toast-root{display:none !important;}
   .view{padding:0; max-width:100%;}
-  body{background:#fff; font-size:12px; color:#111; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  body{background:#fff; font-size:12px; color:#111; font-family:'Sarabun', system-ui, sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
   .card{box-shadow:none; border:1px solid #ccc; page-break-inside:avoid; padding:8px !important; margin-bottom:8px;}
   .card-title{font-size:11px; margin-bottom:5px;}
   .report-table{font-size:12px;}
@@ -384,9 +384,28 @@ canvas.sig-pad{width:100%; height:160px; display:block; touch-action:none; backg
      column — mirrors the original Excel forms, one printed page each. */
   .detailed-sheet{break-inside:avoid;}
   .sheet-break{break-before:page; page-break-before:always;}
-  .detailed-sheet-header{margin-bottom:10px; padding-bottom:7px; border-bottom:2px solid #1c2422;}
+  .detailed-sheet-header{display:flex; align-items:center; gap:10px; margin-bottom:10px; padding-bottom:8px; border-bottom:2.5px solid var(--brand);}
+  .detailed-sheet-header .report-icon{flex:none; line-height:0;}
   .detailed-sheet-title{font-size:18px; font-weight:700; color:#111;}
-  .detailed-sheet-sub{font-size:11.5px; color:#555; margin-top:3px;}
+  .detailed-sheet-sub{font-size:11.5px; color:#555; margin-top:2px;}
+
+  /* Letterhead + per-product summary table on the cover page. */
+  .report-letterhead{display:flex; align-items:center; justify-content:space-between; padding-bottom:14px; margin-bottom:10px; border-bottom:3px solid var(--brand);}
+  .report-letterhead-left{display:flex; align-items:center; gap:12px;}
+  .report-letterhead-logo{width:52px; height:52px; flex:none; border:1.5px dashed #b9c2bd; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:9.5px; color:#8a938e; text-align:center; line-height:1.3;}
+  .report-letterhead-coname{font-size:12px; color:#6b7570; font-weight:500;}
+  .report-letterhead-conote{font-size:14px; font-weight:700; color:#111;}
+  .report-letterhead-right{text-align:right;}
+  .report-letterhead-titletext{font-size:19px; font-weight:700; color:var(--brand);}
+  .report-letterhead-date{font-size:12.5px; color:#6b7570; margin-top:2px;}
+
+  .report-cover-summary-title{font-size:13px; font-weight:700; margin:4px 0 6px;}
+  .report-cover-summary-table{width:100%; border-collapse:collapse; font-size:11.5px;}
+  .report-cover-summary-table th, .report-cover-summary-table td{border:1px solid #ccc; padding:6px 10px;}
+  .report-cover-summary-table th{background:#eef4f0; text-align:left;}
+  .report-cover-summary-table td:not(:first-child){text-align:center;}
+  .report-cover-summary-table td.ok{color:#1f8a4c; font-weight:700;}
+  .report-cover-summary-table td.fail{color:#c0392b; font-weight:700;}
 
   .detailed-report-table{font-size:9.5px; width:100%; table-layout:fixed; border:1.5px solid #333; border-collapse:collapse;}
   .detailed-report-table th, .detailed-report-table td{padding:5px 6px; border:1px solid #bbb; word-break:break-word; white-space:normal; vertical-align:middle; line-height:1.3;}
