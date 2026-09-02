@@ -1488,9 +1488,11 @@ function reportHeaderIconSVG(){
 }
 
 function detailedColWeight(field){
-  // Pass/fail cells only ever hold a single ✓/✗ glyph, so they can stay
-  // narrow; text-ish or longer-value columns get more room.
-  if (field.type === 'pass') return 3;
+  // Pass/fail cells only ever hold a single ✓/✗ glyph, so the DATA rows
+  // stay narrow — but the header text above them can be a long custom
+  // label, so give a little extra room to avoid a very tall, cramped
+  // header row.
+  if (field.type === 'pass') return 4;
   if (field.type === 'time') return 3.5;
   if (field.type === 'select') return 4;
   if (field.type === 'duration' || field.type === 'number') return 4.5;
