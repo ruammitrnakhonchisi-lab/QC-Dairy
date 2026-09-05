@@ -1607,26 +1607,6 @@ VIEWS.dailyReport = function({date}){
       `รวม ${groups.length} ผลิตภัณฑ์ • ${total} ชิ้นงาน${total ? ` • ${Math.round(ok/total*100)}% ผ่าน` : ''}`)
   ));
 
-  if (groups.length){
-    wrap.appendChild(h('div', {class:'print-only report-cover-summary'},
-      h('div', {class:'report-cover-summary-title'}, 'สรุปแยกตามผลิตภัณฑ์'),
-      h('table', {class:'report-cover-summary-table'},
-        h('thead', {}, h('tr', {}, h('th',{},'ผลิตภัณฑ์'), h('th',{},'จำนวนชิ้น'), h('th',{},'ผ่าน'), h('th',{},'ไม่ผ่าน'))),
-        h('tbody', {}, groups.map(g=>{
-          const gFail = g.rows.filter(r=>r.status==='fail').length;
-          const gPending = g.rows.filter(r=>r.status==='pending').length;
-          const gOk = g.rows.length - gFail - gPending;
-          return h('tr', {},
-            h('td', {}, g.template.name),
-            h('td', {}, g.rows.length),
-            h('td', {class:'ok'}, gOk),
-            h('td', {class:'fail'}, gFail)
-          );
-        }))
-      )
-    ));
-  }
-
   if (!groups.length){
     wrap.appendChild(h('div', {class:'card empty'}, h('span',{class:'ic'},'📭'), 'ไม่มีข้อมูลการตรวจในวันที่นี้'));
   } else {
