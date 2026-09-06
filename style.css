@@ -335,6 +335,7 @@ canvas.sig-pad{width:100%; height:160px; display:block; touch-action:none; backg
 .filter-chips{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:10px;}
 .filter-chip{flex:none; padding:7px 13px; border-radius:99px; background:var(--surface); border:1px solid var(--border); font-size:12.5px; font-weight:600; color:var(--text-dim); cursor:pointer; white-space:nowrap;}
 .filter-chip.active{background:var(--brand); color:#fff; border-color:var(--brand);}
+.filter-chip.disabled{cursor:default; opacity:.55;}
 
 .link-btn{background:none;border:none;color:var(--brand);font-weight:600;font-size:13px;cursor:pointer;padding:6px 0;}
 

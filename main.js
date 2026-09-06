@@ -935,27 +935,63 @@ function openAddPieceModal(tpl, draft){
     const count = draft.pieces.filter(p=>p.name.startsWith(tpl.autoNumberPrefix)).length;
     chosenName = `${tpl.autoNumberPrefix} ${count+1}`;
   }
-  const nameInput = h('input', {type:'text', placeholder:'ชื่อ/รหัสชิ้นงาน', value: chosenName});
-  const chipsWrap = h('div', {class:'filter-chips'});
-  (tpl.presetPieces||[]).forEach(preset=>{
-    chipsWrap.appendChild(h('div', {class:'filter-chip', onclick:()=>{ nameInput.value = preset; nameInput.focus(); }}, preset));
+  const existingNames = new Set(draft.pieces.map(p=>p.name));
+  const selected = new Set();
+  const presets = tpl.presetPieces || [];
+
+  const nameInput = h('input', {type:'text', placeholder:'ชื่อ/รหัสชิ้นงาน (พิมพ์เพิ่มนอกรายการ)', value: chosenName, oninput: updateAddBtn});
+  const chipsWrap = h('div', {class:'filter-chips', style:{flexWrap:'wrap'}});
+  presets.forEach(preset=>{
+    if (existingNames.has(preset)){
+      chipsWrap.appendChild(h('div', {class:'filter-chip disabled'}, `✓ ${preset}`));
+      return;
+    }
+    const chip = h('div', {class:'filter-chip', onclick:()=>{
+      if (selected.has(preset)){ selected.delete(preset); chip.classList.remove('active'); }
+      else { selected.add(preset); chip.classList.add('active'); }
+      updateAddBtn();
+    }}, preset);
+    chipsWrap.appendChild(chip);
   });
+
+  const addBtn = h('button', {class:'btn', onclick:()=>{
+    const manualName = nameInput.value.trim();
+    const names = [...selected];
+    if (manualName && !names.includes(manualName)) names.push(manualName);
+    if (!names.length){ toast('กรุณาเลือกหรือระบุชื่อชิ้นงานอย่างน้อย 1 รายการ','err'); return; }
+    const added = [];
+    names.forEach(name=>{
+      if (existingNames.has(name)) return;
+      const piece = {id:uid(), name, values:{}, notes:{}, photos:{}, remark:''};
+      draft.pieces.push(piece);
+      added.push(piece);
+    });
+    if (!added.length){ toast('ชิ้นงานเหล่านี้ถูกเพิ่มไปแล้ว','err'); return; }
+    DB.saveDraft(draft);
+    closeModal();
+    if (added.length === 1){
+      go('newPiece', {pieceId: added[0].id});
+    } else {
+      toast(`เพิ่ม ${added.length} ชิ้นงานแล้ว — แตะแต่ละชิ้นเพื่อเริ่มตรวจ`, 'ok');
+      render();
+    }
+  }}, 'เพิ่มและเริ่มตรวจ');
+
+  function updateAddBtn(){
+    const manualName = nameInput.value.trim();
+    const total = selected.size + (manualName && !selected.has(manualName) ? 1 : 0);
+    addBtn.textContent = total > 1 ? `เพิ่ม ${total} ชิ้นงาน` : 'เพิ่มและเริ่มตรวจ';
+    addBtn.disabled = total === 0;
+  }
+  updateAddBtn();
 
   openModal(h('div', {},
     h('div', {class:'modal-title'}, 'เพิ่มชิ้นงานตรวจ'),
-    (tpl.presetPieces||[]).length ? h('div', {class:'field'}, h('label',{},'เลือกจากรายการ'), chipsWrap) : null,
+    presets.length ? h('div', {class:'field'}, h('label',{},'เลือกจากรายการ (แตะได้หลายชิ้น)'), chipsWrap) : null,
     h('div', {class:'field'}, h('label',{},'ชื่อ/รหัสชิ้นงาน'), nameInput),
     h('div', {class:'btn-row'},
       h('button', {class:'btn secondary', onclick:closeModal}, 'ยกเลิก'),
-      h('button', {class:'btn', onclick:()=>{
-        const name = nameInput.value.trim();
-        if (!name){ toast('กรุณาระบุชื่อชิ้นงาน','err'); return; }
-        const piece = {id:uid(), name, values:{}, notes:{}, photos:{}, remark:''};
-        draft.pieces.push(piece);
-        DB.saveDraft(draft);
-        closeModal();
-        go('newPiece', {pieceId: piece.id});
-      }}, 'เพิ่มและเริ่มตรวจ')
+      addBtn
     )
   ), {center:true});
   setTimeout(()=>nameInput.focus(), 50);
