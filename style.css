@@ -434,3 +434,21 @@ canvas.sig-pad{width:100%; height:160px; display:block; touch-action:none; backg
 .rp-log{padding:8px 0; border-bottom:1px solid var(--border); font-size:13.5px;}
 .rp-log:last-child{border-bottom:none;}
 .rp-log small{display:block; color:var(--text-dim); font-size:11.5px;}
+
+/* Repair report prints on a single A4 portrait page (named page overrides the
+   global A4 landscape @page used by the QC reports). */
+@page rpA4{ size: A4 portrait; margin: 10mm; }
+@media print{
+  .rp-sheet{page:rpA4; font-size:11px; break-inside:avoid; page-break-inside:avoid;}
+  .rp-sheet .rp-steps{display:none;}
+  .rp-sheet .card{margin-bottom:5px; padding:6px 8px !important; break-inside:avoid;}
+  .rp-sheet .section-title{font-size:12px; margin:6px 0 3px;}
+  .rp-sheet .kv-list .kv{padding:3px 0; font-size:11px;}
+  .rp-sheet .rp-log{padding:3px 0; font-size:10.5px;}
+  .rp-sheet .rp-log small{font-size:9.5px;}
+  .rp-sheet .photo-strip{gap:5px; margin-top:3px; flex-wrap:nowrap;}
+  .rp-sheet .photo-strip.big .photo-thumb, .rp-sheet .photo-thumb{width:28mm; height:28mm; flex:none;}
+  .rp-sheet .rp-log .photo-strip{display:none;} /* mid-repair photos stay on screen; print keeps before/after */
+  .rp-sheet .photo-thumb .rm, .rp-sheet .photo-add{display:none;}
+  .rp-sheet img[alt], .rp-sheet .card > img{max-height:16mm; width:auto !important; max-width:50mm !important;}
+}

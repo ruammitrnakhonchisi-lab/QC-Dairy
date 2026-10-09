@@ -203,7 +203,7 @@ VIEWS.repairDetail = function({id}){
   const ui = _rpUI[id] || (_rpUI[id] = {by:repairWho(), note:'', photos:[], sup:'', supNote:'', sig:{signature:null}});
   const saveLater = debounce(()=>{ DB.saveRepair(job); }, 500);
   const commit = ()=>{ DB.saveRepair(job); render(); };
-  const wrap = h('div', {});
+  const wrap = h('div', {class:'rp-sheet'});
   const st = job.status;
 
   // progress steps
