@@ -280,7 +280,7 @@ function ensureSeedLocal(){
 }
 
 /* ---------------- cloud sync (Firestore) ---------------- */
-const CLOUD = { _templates: undefined, _employees: undefined, _records: undefined };
+const CLOUD = { _templates: undefined, _employees: undefined, _records: undefined, _repairs: undefined };
 function cloudErr(err){ console.error('cloud sync error', err); toast('ซิงค์ข้อมูลไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต','err'); }
 function cloudDocRef(name){ return firebase.firestore().collection('qc_meta').doc(name); }
 function cloudCol(name){ return firebase.firestore().collection(name); }
@@ -341,6 +341,18 @@ function initCloudSync(){
             if (!firstRec){ firstRec=true; bump(); }
             if (changed) safeRender();
           }, err=>{ cloudErr(err); if (!firstRec){ firstRec=true; bump(); } });
+
+          // Repair jobs: not counted in the startup gate (bump) — if Firestore
+          // rules reject this collection, repair.js falls back to localStorage.
+          db.collection('repairs').orderBy('createdAt','desc').onSnapshot(snap=>{
+            const next = snap.docs.map(d=>d.data());
+            const changed = JSON.stringify(next) !== JSON.stringify(CLOUD._repairs);
+            CLOUD._repairs = next;
+            if (changed) safeRender();
+          }, err=>{
+            console.error('repairs listener failed', err);
+            toast('ซิงค์งานซ่อมไม่ได้ (เก็บในเครื่องแทน) — ตรวจ Firestore rules ของ collection "repairs"','err');
+          });
         }catch(err){
           console.error('failed to attach Firestore listeners', err);
           finish();
@@ -703,6 +715,8 @@ VIEWS.home = function(){
       )
     ));
   }
+
+  wrap.appendChild(repairHomeCard());
 
   wrap.appendChild(h('div', {class:'grid-actions'},
     h('div', {class:'action-tile', onclick:()=>switchTab('new')}, h('span',{class:'ic'},'📝'), h('div',{class:'lb'},'ตรวจงานใหม่')),
@@ -1173,11 +1187,12 @@ VIEWS.newFinish = function(){
   return wrap;
 };
 
-function buildSignaturePad(draft){
+function buildSignaturePad(draft, onSave){
+  const persist = onSave || ((d)=>DB.saveDraft(d));
   const wrap = h('div', {class:'sig-pad-wrap'});
   const canvas = h('canvas', {class:'sig-pad'});
   wrap.appendChild(canvas);
-  const clearBtn = h('button', {class:'btn secondary sm', style:{marginTop:'8px'}, onclick:()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); draft.signature=null; DB.saveDraft(draft); }}, 'ล้างลายเซ็น');
+  const clearBtn = h('button', {class:'btn secondary sm', style:{marginTop:'8px'}, onclick:()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); draft.signature=null; persist(draft); }}, 'ล้างลายเซ็น');
 
   let ctx, drawing=false, last=null;
   function setup(){
@@ -1209,7 +1224,7 @@ function buildSignaturePad(draft){
   function end(){
     if (!drawing) return; drawing=false;
     draft.signature = canvas.toDataURL('image/png');
-    DB.saveDraft(draft);
+    persist(draft);
   }
   canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
   canvas.addEventListener('touchstart', start, {passive:false}); canvas.addEventListener('touchmove', move, {passive:false}); canvas.addEventListener('touchend', end);
