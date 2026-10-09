@@ -44,6 +44,26 @@ DB.saveRepair = function(job){
   }
   return save(REPAIR_KEY, list);
 };
+DB.deleteRepair = function(id){
+  const list = this.repairs().filter(r=>r.id!==id);
+  if (repairCloudOn()){
+    CLOUD._repairs = list;
+    try{ cloudCol('repairs').doc(id).delete().catch(cloudErr); }catch(err){ cloudErr(err); }
+    return true;
+  }
+  return save(REPAIR_KEY, list);
+};
+// The repair report prints portrait while every other report stays landscape.
+// A named @page would force extra page breaks (a blank 2nd page), so swap the
+// page orientation only for the duration of the print instead.
+window.addEventListener('beforeprint', ()=>{
+  if (!document.querySelector('.rp-sheet') || document.getElementById('rpPrintPage')) return;
+  const s = document.createElement('style');
+  s.id = 'rpPrintPage';
+  s.textContent = '@page{size:A4 portrait;margin:10mm}';
+  document.head.appendChild(s);
+});
+window.addEventListener('afterprint', ()=>{ const s = document.getElementById('rpPrintPage'); if (s) s.remove(); });
 function repairClone(id){ const j = DB.repair(id); return j ? JSON.parse(JSON.stringify(j)) : null; }
 function repairNo(){
   const d = new Date();
@@ -375,5 +395,14 @@ VIEWS.repairDetail = function({id}){
     ));
   });
   wrap.appendChild(hist);
+
+  wrap.appendChild(h('button', {class:'btn danger no-print', style:{marginTop:'12px'}, onclick:()=>{
+    confirmDialog('ลบรายงานซ่อม', `ลบ ${job.no} ถาวรหรือไม่? ข้อมูลและรูปทั้งหมดของงานซ่อมนี้จะหายไป`, ()=>{
+      if (!DB.deleteRepair(id)) return;
+      delete _rpUI[id];
+      toast('ลบรายงานซ่อมแล้ว');
+      back();
+    });
+  }}, '🗑 ลบรายงานซ่อม'));
   return wrap;
 };
