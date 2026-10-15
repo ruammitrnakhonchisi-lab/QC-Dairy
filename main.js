@@ -499,12 +499,12 @@ function fileToCompressedDataURL(file, maxDim=900, quality=0.72){
 /* ============================================================
    APP STATE / ROUTER
    ============================================================ */
-const ROOT_VIEWS = {home:'home', new:'newStart', history:'historyList', settings:'settingsHome'};
+const ROOT_VIEWS = {home:'home', new:'newStart', history:'historyList', repair:'repairList', settings:'settingsHome'};
 const state = {
   tab: 'home',
   stacks: {
     home:[{view:'home'}], new:[{view:'newStart'}],
-    history:[{view:'historyList'}], settings:[{view:'settingsHome'}]
+    history:[{view:'historyList'}], repair:[{view:'repairList'}], settings:[{view:'settingsHome'}]
   },
   chrome: {title:'QC Precast', subtitle:'', menu:null},
   historyFilter: {status:'all', type:'all', q:''}

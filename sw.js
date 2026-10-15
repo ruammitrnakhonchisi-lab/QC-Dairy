@@ -1,4 +1,4 @@
-const CACHE = 'qc-precast-v3';
+const CACHE = 'qc-precast-v4';
 const ASSETS = ['./', './index.html', './style.css', './main.js', './repair.js', './firebase-config.js', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -14,7 +14,7 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
     // network-first: always get the latest app files, fall back to cache offline
-    fetch(e.request).then(res => {
+    fetch(e.request, {cache: 'no-cache'}).then(res => {
       if (res && res.status === 200) {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, copy));

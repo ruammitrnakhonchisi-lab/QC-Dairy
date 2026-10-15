@@ -127,14 +127,14 @@ function rpPhotoStrip(photos, {max=4, editable=true, onChange}){
 function repairHomeCard(){
   const c = repairCounts();
   const open = c.repairing + c.awaiting;
-  return h('div', {class:'card', style:{borderLeft:'4px solid '+(c.awaiting?'var(--brand)':c.repairing?'var(--warn)':'var(--border)'), cursor:'pointer'}, onclick:()=>go('repairList')},
+  return h('div', {class:'card', style:{borderLeft:'4px solid '+(c.awaiting?'var(--brand)':c.repairing?'var(--warn)':'var(--border)'), cursor:'pointer'}, onclick:()=>switchTab('repair')},
     h('div', {class:'card-title'}, '🔧 สินค้าชำรุด · งานซ่อมก่อนเก็บเข้าสต๊อก'),
     h('div', {style:{display:'flex', gap:'14px', fontSize:'13.5px', flexWrap:'wrap'}},
       h('span', {}, h('b', {}, c.repairing), ' กำลังซ่อม'),
       h('span', {}, h('b', {}, c.awaiting), ' รออนุมัติ'),
       h('span', {style:{color:'var(--text-dim)'}}, open ? 'แตะเพื่อดูรายการ →' : 'แตะเพื่อดูงานซ่อม →')
     ),
-    h('button', {class:'btn', style:{marginTop:'12px'}, onclick:(e)=>{ e.stopPropagation(); go('repairNew',{}); }}, '＋ เพิ่มสินค้าชำรุด')
+    h('button', {class:'btn', style:{marginTop:'12px'}, onclick:(e)=>{ e.stopPropagation(); goCrossTab('repair','repairNew',{}); }}, '＋ เพิ่มสินค้าชำรุด')
   );
 }
 /* ---------------- list ---------------- */
