@@ -558,6 +558,11 @@ function render(){
     menuBtn.onclick = state.chrome.menu.action;
   } else { menuBtn.hidden = true; menuBtn.onclick = null; }
   qsa('.tab-item').forEach(b=>b.classList.toggle('active', b.dataset.tab === state.tab));
+  const inRepair = state.tab === 'repair';
+  document.body.classList.toggle('in-repair', inRepair);
+  qs('#btnModeInspect').classList.toggle('active', !inRepair);
+  qs('#btnModeRepair').classList.toggle('active', inRepair);
+  if (!inRepair) state.lastInspectTab = state.tab;
   viewEl.scrollTop = 0;
 }
 // Like render(), but skips the rebuild if the user is actively typing in a
@@ -716,19 +721,11 @@ VIEWS.home = function(){
     ));
   }
 
-  wrap.appendChild(repairHomeCard());
 
-  wrap.appendChild(h('div', {class:'grid-actions'},
-    h('div', {class:'action-tile', onclick:()=>switchTab('new')}, h('span',{class:'ic'},'📝'), h('div',{class:'lb'},'ตรวจงานใหม่')),
-    h('div', {class:'action-tile', onclick:()=>switchTab('history')}, h('span',{class:'ic'},'📋'), h('div',{class:'lb'},'ประวัติการตรวจ')),
-    h('div', {class:'action-tile', onclick:()=>goCrossTab('settings','employees',{})}, h('span',{class:'ic'},'👷'), h('div',{class:'lb'},'พนักงาน')),
-    h('div', {class:'action-tile', onclick:()=>goCrossTab('settings','templates',{})}, h('span',{class:'ic'},'🧩'), h('div',{class:'lb'},'แบบฟอร์มตรวจ'))
-  ));
-
-  const recent = [...records].sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
-  wrap.appendChild(h('div', {class:'section-title'}, 'รายการล่าสุด'));
+  const recent = records.filter(r=>recordStatus(r)==='pending').sort((a,b)=>b.createdAt-a.createdAt);
+  wrap.appendChild(h('div', {class:'section-title'}, 'งานที่ค้างอยู่ (ตรวจยังไม่ครบ)'));
   if (!recent.length){
-    wrap.appendChild(h('div', {class:'card empty'}, h('span',{class:'ic'},'🗂️'), 'ยังไม่มีประวัติการตรวจ'));
+    wrap.appendChild(h('div', {class:'card empty'}, h('span',{class:'ic'},'🗂️'), 'ไม่มีงานค้าง 🎉'));
   } else {
     const card = h('div', {class:'card'});
     recent.forEach(r=>{
@@ -2126,6 +2123,8 @@ async function boot(){
   applyTheme();
   qs('#btnBack').addEventListener('click', back);
   qsa('.tab-item').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
+  qs('#btnModeRepair').addEventListener('click', ()=>{ if (state.tab !== 'repair'){ state.tab = 'repair'; render(); } });
+  qs('#btnModeInspect').addEventListener('click', ()=>{ if (state.tab === 'repair'){ state.tab = state.lastInspectTab || 'home'; render(); } });
 
   // Always have usable data and a rendered app immediately — never block
   // the first paint on a network-dependent cloud connection.

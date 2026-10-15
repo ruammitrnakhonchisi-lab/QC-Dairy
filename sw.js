@@ -1,4 +1,4 @@
-const CACHE = 'qc-precast-v4';
+const CACHE = 'qc-precast-v7';
 const ASSETS = ['./', './index.html', './style.css', './main.js', './repair.js', './firebase-config.js', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {

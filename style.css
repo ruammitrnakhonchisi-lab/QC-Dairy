@@ -452,3 +452,8 @@ canvas.sig-pad{width:100%; height:160px; display:block; touch-action:none; backg
   .rp-sheet .photo-thumb .rm, .rp-sheet .photo-add{display:none;}
   .rp-sheet img[alt], .rp-sheet .card > img{max-height:16mm; width:auto !important; max-width:50mm !important;}
 }
+
+.top-pill{border:1px solid rgba(255,255,255,.55); background:rgba(255,255,255,.16); color:#fff; font:inherit; font-size:13px; font-weight:600; padding:6px 10px; border-radius:999px; white-space:nowrap; cursor:pointer;}
+.mode-switch{display:flex; gap:4px; flex-shrink:0;}
+.top-pill.active{background:#fff; color:var(--brand); border-color:#fff;}
+body.in-repair .tabbar{display:none;}
