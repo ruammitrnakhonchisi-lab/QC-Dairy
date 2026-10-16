@@ -111,13 +111,24 @@ function rpPhotoStrip(photos, {max=4, editable=true, onChange}){
     ));
   });
   if (editable && photos.length < max){
-    const fileInput = h('input', {type:'file', accept:'image/*', capture:'environment', style:{display:'none'}, onchange: async (e)=>{
-      const file = e.target.files[0]; if (!file) return;
-      try{ photos.push(await fileToCompressedDataURL(file, 800, 0.6)); onChange(); }
-      catch(err){ toast('เพิ่มรูปไม่สำเร็จ','err'); }
+    // Camera tile opens the camera directly; gallery tile lets the user pick
+    // existing photos from the phone (several at once, up to the limit).
+    const onPick = async (e)=>{
+      const files = [...e.target.files].slice(0, max - photos.length);
       e.target.value = '';
-    }});
-    strip.appendChild(h('div', {class:'photo-add', onclick:()=>fileInput.click()}, '📷', fileInput));
+      if (!files.length) return;
+      let failed = false;
+      for (const file of files){
+        try{ photos.push(await fileToCompressedDataURL(file, 800, 0.6)); }
+        catch(err){ failed = true; }
+      }
+      if (failed) toast('เพิ่มรูปบางรูปไม่สำเร็จ','err');
+      onChange();
+    };
+    const camInput = h('input', {type:'file', accept:'image/*', capture:'environment', style:{display:'none'}, onchange:onPick});
+    const galInput = h('input', {type:'file', accept:'image/*', multiple:true, style:{display:'none'}, onchange:onPick});
+    strip.appendChild(h('div', {class:'photo-add', 'aria-label':'ถ่ายรูป', onclick:()=>camInput.click()}, '📷', h('small',{},'ถ่ายรูป'), camInput));
+    strip.appendChild(h('div', {class:'photo-add', 'aria-label':'เลือกรูปจากเครื่อง', onclick:()=>galInput.click()}, '🖼️', h('small',{},'จากเครื่อง'), galInput));
   }
   if (!photos.length && !editable) strip.appendChild(h('div', {style:{color:'var(--text-dim)', fontSize:'13px'}}, 'ไม่มีรูป'));
   return strip;
