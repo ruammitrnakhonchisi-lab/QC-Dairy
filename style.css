@@ -471,3 +471,37 @@ canvas.sig-pad{width:100%; height:160px; display:block; touch-action:none; backg
 }
 .top-pill.active{background:#fff; color:var(--brand); border-color:#fff;}
 body.in-repair .tabbar{display:none;}
+
+/* ---------------- Knowledge mode (learn.js) ---------------- */
+.ln-hero{background:linear-gradient(135deg,var(--brand),var(--accent)); color:#fff; border-radius:var(--radius); padding:18px; margin-bottom:12px;}
+.ln-hero .t{font-size:20px; font-weight:700;} .ln-hero .s{font-size:13.5px; opacity:.92; margin-top:4px;}
+.ln-topic{display:flex; align-items:center; gap:14px; cursor:pointer; margin-bottom:10px;}
+.ln-topic .ic{font-size:30px; width:52px; height:52px; display:grid; place-items:center; background:var(--brand-light); border-radius:14px; flex:none;}
+.ln-topic .tx{flex:1; min-width:0;} .ln-topic .tt{font-size:16px; font-weight:700;} .ln-topic .ts{font-size:13px; color:var(--text-dim); margin-top:2px;} .ln-topic .tu{font-size:11.5px; color:var(--text-dim); margin-top:4px;}
+.ln-topic .chev{font-size:26px; color:var(--text-dim);}
+.ln-topic.quiz{border:1.5px dashed var(--brand);} .ln-topic.quiz .ic{background:var(--warn-light);}
+.ln-page .filter-chips{margin-bottom:12px;}
+.ln-sub{font-size:13px; color:var(--text-dim); margin:0 2px 8px;}
+.ln-upd{font-size:12px; color:var(--text-dim); text-align:center; margin:14px 0 6px;}
+.ln-tip{background:var(--warn-light); border-left:4px solid var(--warn); border-radius:var(--radius-sm); padding:10px 12px; font-size:13.5px; margin-top:12px; line-height:1.5;}
+.ln-hint{font-size:13px; color:var(--text-dim); text-align:center; margin:4px 0 10px;}
+.ln-table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface);}
+.ln-table{border-collapse:collapse; width:100%; font-size:14px; min-width:100%;}
+.ln-table th{background:var(--brand-light); color:var(--brand); font-weight:700; padding:9px 8px; text-align:center; white-space:nowrap; font-size:12.5px;}
+.ln-table td{padding:9px 8px; text-align:center; border-top:1px solid var(--border); white-space:nowrap;}
+.ln-table td.first{font-weight:700; text-align:left; position:sticky; left:0; background:var(--surface);}
+.ln-table tr.hl td{background:var(--brand-light);} .ln-table tbody tr{cursor:default;}
+.ln-group{margin-bottom:12px; padding:12px;} .ln-gt{font-weight:700; font-size:15px; margin-bottom:8px;}
+.ln-detail .ln-dt{font-size:18px; font-weight:700;} .ln-slump{color:var(--text-dim); font-size:13.5px; margin:2px 0 10px;} .ln-slump b{color:var(--text);}
+.ln-ing .row,.ln-total{display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-top:1px solid var(--border); font-size:15.5px;}
+.ln-ing .row b{font-size:17px; color:var(--brand);} .ln-total{border-top:2px solid var(--brand); font-weight:700; margin-top:2px;}
+.ln-result{text-align:center; margin-bottom:12px; background:var(--brand-light);} .ln-result .q{font-size:14px; color:var(--text-dim);}
+.ln-result .big{font-size:44px; font-weight:800; color:var(--brand); line-height:1.2;} .ln-result .big span{font-size:18px; font-weight:600;} .ln-result .brk{font-size:13.5px;}
+.ln-prog{display:flex; justify-content:space-between; font-size:13px; color:var(--text-dim); margin-bottom:6px;}
+.ln-bar{height:6px; background:var(--border); border-radius:9px; overflow:hidden; margin-bottom:12px;} .ln-bar i{display:block; height:100%; background:var(--brand); transition:width .25s;}
+.ln-q{font-size:17px; font-weight:700; line-height:1.5; margin-bottom:12px;}
+.ln-opts{display:grid; gap:9px;}
+.ln-opt{font:inherit; font-size:16px; padding:14px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--surface); color:var(--text); text-align:left; cursor:pointer;}
+.ln-opt.right{background:var(--ok-light); border-color:var(--ok); color:var(--ok); font-weight:700;} .ln-opt.wrong{background:var(--danger-light); border-color:var(--danger); color:var(--danger);}
+.ln-fb{margin:12px 0; font-size:14px; line-height:1.5;} .ln-fb.ok{color:var(--ok);} .ln-fb.bad{color:var(--danger);}
+.ln-score{text-align:center;} .ln-score .em{font-size:48px;} .ln-score .big{font-size:40px; font-weight:800; color:var(--brand);} .ln-score .msg{margin:6px 0 16px; color:var(--text-dim);}

@@ -499,12 +499,12 @@ function fileToCompressedDataURL(file, maxDim=900, quality=0.72){
 /* ============================================================
    APP STATE / ROUTER
    ============================================================ */
-const ROOT_VIEWS = {home:'home', new:'newStart', history:'historyList', repair:'repairList', settings:'settingsHome'};
+const ROOT_VIEWS = {home:'home', new:'newStart', history:'historyList', repair:'repairList', learn:'learnHome', settings:'settingsHome'};
 const state = {
   tab: 'home',
   stacks: {
     home:[{view:'home'}], new:[{view:'newStart'}],
-    history:[{view:'historyList'}], repair:[{view:'repairList'}], settings:[{view:'settingsHome'}]
+    history:[{view:'historyList'}], repair:[{view:'repairList'}], learn:[{view:'learnHome'}], settings:[{view:'settingsHome'}]
   },
   chrome: {title:'QC Precast', subtitle:'', menu:null},
   historyFilter: {status:'all', type:'all', q:''}
@@ -558,11 +558,12 @@ function render(){
     menuBtn.onclick = state.chrome.menu.action;
   } else { menuBtn.hidden = true; menuBtn.onclick = null; }
   qsa('.tab-item').forEach(b=>b.classList.toggle('active', b.dataset.tab === state.tab));
-  const inRepair = state.tab === 'repair';
-  document.body.classList.toggle('in-repair', inRepair);
-  qs('#btnModeInspect').classList.toggle('active', !inRepair);
+  const inRepair = state.tab === 'repair', inLearn = state.tab === 'learn';
+  document.body.classList.toggle('in-repair', inRepair || inLearn);
+  qs('#btnModeInspect').classList.toggle('active', !inRepair && !inLearn);
   qs('#btnModeRepair').classList.toggle('active', inRepair);
-  if (!inRepair) state.lastInspectTab = state.tab;
+  qs('#btnModeLearn').classList.toggle('active', inLearn);
+  if (!inRepair && !inLearn) state.lastInspectTab = state.tab;
   viewEl.scrollTop = 0;
 }
 // Like render(), but skips the rebuild if the user is actively typing in a
@@ -2124,7 +2125,8 @@ async function boot(){
   qs('#btnBack').addEventListener('click', back);
   qsa('.tab-item').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
   qs('#btnModeRepair').addEventListener('click', ()=>{ if (state.tab !== 'repair'){ state.tab = 'repair'; render(); } });
-  qs('#btnModeInspect').addEventListener('click', ()=>{ if (state.tab === 'repair'){ state.tab = state.lastInspectTab || 'home'; render(); } });
+  qs('#btnModeLearn').addEventListener('click', ()=>{ if (state.tab !== 'learn'){ state.tab = 'learn'; render(); } });
+  qs('#btnModeInspect').addEventListener('click', ()=>{ if (state.tab === 'repair' || state.tab === 'learn'){ state.tab = state.lastInspectTab || 'home'; render(); } });
 
   // Always have usable data and a rendered app immediately — never block
   // the first paint on a network-dependent cloud connection.

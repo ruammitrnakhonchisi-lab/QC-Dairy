@@ -1,5 +1,5 @@
-const CACHE = 'qc-precast-v7';
-const ASSETS = ['./', './index.html', './style.css', './main.js', './repair.js', './firebase-config.js', './manifest.webmanifest'];
+const CACHE = 'qc-precast-v8';
+const ASSETS = ['./', './index.html', './style.css', './main.js', './repair.js', './learn.js', './knowledge-data.js', './firebase-config.js', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
