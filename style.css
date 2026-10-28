@@ -505,3 +505,9 @@ body.in-repair .tabbar{display:none;}
 .ln-opt.right{background:var(--ok-light); border-color:var(--ok); color:var(--ok); font-weight:700;} .ln-opt.wrong{background:var(--danger-light); border-color:var(--danger); color:var(--danger);}
 .ln-fb{margin:12px 0; font-size:14px; line-height:1.5;} .ln-fb.ok{color:var(--ok);} .ln-fb.bad{color:var(--danger);}
 .ln-score{text-align:center;} .ln-score .em{font-size:48px;} .ln-score .big{font-size:40px; font-weight:800; color:var(--brand);} .ln-score .msg{margin:6px 0 16px; color:var(--text-dim);}
+.ln-in{font:inherit; font-size:15px; padding:6px 7px; text-align:center; border:1.5px solid var(--brand); border-radius:7px; background:var(--surface); color:var(--text); max-width:100%;}
+.ln-edit-banner{background:var(--brand-light); border:1.5px solid var(--brand); border-radius:var(--radius-sm); padding:10px 12px; font-size:13.5px; margin-bottom:12px;}
+.ln-edit-banner .bt{display:flex; gap:8px; margin-top:8px;} .ln-edit-banner .btn{width:auto; flex:1; padding:8px 10px; font-size:14px;}
+.ln-meta{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:7px 0; font-size:14px; color:var(--text-dim);}
+.ln-upd .ln-in{padding:3px 6px; font-size:12.5px;} .ln-tip .ln-in{text-align:left; width:100%; margin-top:6px;}
+.ln-sub .ln-in{text-align:left; width:100%;}

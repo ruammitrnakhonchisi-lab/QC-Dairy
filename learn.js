@@ -1,8 +1,17 @@
 /* ============================================================
    KNOWLEDGE MODE (ความรู้งานผลิต) — review material for new staff
-   Loaded after main.js + knowledge-data.js. Read-only reference built from the
+   Loaded after main.js + knowledge-data.js. Reference built from the
    factory's "ปริมาณวัตถุดิบ" sheets (see knowledge-data.js), plus a quiz.
+
+   The numbers are editable (✏️ in the top bar). Edits are saved on this device
+   (localStorage) and synced to Firestore doc qc_meta/knowledge so every device
+   gets the update. "รีเซ็ต" goes back to the values shipped in knowledge-data.js.
    ============================================================ */
+
+const LN_KEY = 'qc_knowledge_v1';
+const LN_SECTIONS = ['mix', 'ring', 'wire', 'plate'];
+const KNOWLEDGE_DEFAULT = JSON.parse(JSON.stringify(KNOWLEDGE));
+const LN = {edit:false, syncing:false};
 
 const LEARN_TOPICS = [
   {view:'learnMix',   icon:'🧱', title:'สูตรคอนกรีต (Mix Design)', sub:'ปูน หิน ทราย น้ำ น้ำยา ของสินค้าแต่ละชนิด', get upd(){ return KNOWLEDGE.mix.update; }},
@@ -11,14 +20,95 @@ const LEARN_TOPICS = [
   {view:'learnPlate', icon:'🔩', title:'หัวเพลท & ขาเพลท',        sub:'เหล็กเพลท และเหล็กหนวดกุ้ง (ตัว L)',          get upd(){ return KNOWLEDGE.plate.update; }}
 ];
 
+/* ---------------- storage + sync ---------------- */
+function lnApply(data){ LN_SECTIONS.forEach(k=>{ if (data && data[k]) KNOWLEDGE[k] = data[k]; }); }
+(function(){ const o = load(LN_KEY, null); if (o && o.data) lnApply(o.data); })();
+
+function lnCloudOn(){
+  return typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED && typeof firebase !== 'undefined' && !!firebase.firestore;
+}
+function lnPersist(){
+  const data = JSON.parse(JSON.stringify(KNOWLEDGE));
+  const savedAt = Date.now();
+  save(LN_KEY, {data, savedAt});
+  if (lnCloudOn()){
+    try{
+      cloudDocRef('knowledge').set({json: JSON.stringify(data), savedAt})
+        .catch(err=>{ console.error(err); toast('บันทึกในเครื่องนี้แล้ว แต่ส่งให้เครื่องอื่นไม่สำเร็จ','err'); });
+    }catch(err){ console.error(err); }
+  }
+}
+// Pull edits made on other devices. Started lazily when the knowledge tab opens.
+function lnStartSync(){
+  if (LN.syncing || !lnCloudOn()) return;
+  LN.syncing = true;
+  let attached = false;
+  firebase.auth().onAuthStateChanged(user=>{
+    if (!user || attached) return;
+    attached = true;
+    try{
+      cloudDocRef('knowledge').onSnapshot(snap=>{
+        if (!snap.exists) return;
+        const d = snap.data();
+        const local = load(LN_KEY, null);
+        if (!d.json || (local && local.savedAt >= d.savedAt)) return;
+        try{
+          const data = JSON.parse(d.json);
+          lnApply(data);
+          save(LN_KEY, {data, savedAt: d.savedAt});
+          if (state.tab === 'learn' && !LN.edit) safeRender();
+        }catch(err){ console.error('bad knowledge doc', err); }
+      }, err=>console.warn('knowledge listener failed', err));
+    }catch(err){ console.warn(err); }
+  });
+}
+function lnReset(){
+  if (!confirm('รีเซ็ตตัวเลขทุกหัวข้อกลับเป็นค่าตั้งต้น?\n(การแก้ไขที่ทำไว้ทั้งหมดจะหายไป และเครื่องอื่นจะถูกรีเซ็ตด้วย)')) return;
+  lnApply(JSON.parse(JSON.stringify(KNOWLEDGE_DEFAULT)));
+  lnPersist();
+  toast('รีเซ็ตแล้ว');
+  render();
+}
+
 /* ---------------- helpers ---------------- */
 function lnNum(v, d=2){
   if (v == null || v === '-' || v === '') return '–';
   if (typeof v !== 'number') return String(v);
   return String(Math.round(v * 10**d) / 10**d);
 }
-function lnUpdated(text){ return h('div', {class:'ln-upd'}, 'ข้อมูลอัปเดต ' + text + ' · จากเอกสารมาตรฐานโรงงาน'); }
-function lnTable(head, rows, opts={}){
+function lnParse(s, text){
+  s = String(s).trim();
+  if (text) return s;
+  if (s === '') return '-';
+  const n = Number(s.replace(/,/g, ''));
+  return isNaN(n) ? s : n;
+}
+const lnRound2 = n => Math.round(n * 100) / 100;
+
+// A value that is plain text normally and an input box in edit mode.
+//   opts.d      decimals when shown as text      opts.text   keep what was typed as text
+//   opts.zero   store 0 instead of '-' for empty opts.after  recalculate other fields (re-renders)
+//   opts.w      input width in px
+function lnEd(obj, key, opts={}){
+  const v = obj[key];
+  if (!LN.edit) return opts.show ? opts.show(v) : lnNum(v, opts.d == null ? 2 : opts.d);
+  const inp = h('input', {class:'ln-in', type:'text', inputmode: opts.text ? 'text' : 'decimal', value: v == null ? '' : String(v),
+    style:{width:(opts.w || 72) + 'px'},
+    onfocus:(e)=>e.target.select(),
+    onchange:(e)=>{
+      let nv = lnParse(e.target.value, opts.text);
+      if (opts.zero && nv === '-') nv = 0;
+      obj[key] = nv;
+      if (opts.after){ opts.after(); }
+      lnPersist();
+      if (opts.after) render();
+    }});
+  return inp;
+}
+function lnUpdated(K){
+  return h('div', {class:'ln-upd'}, 'ข้อมูลอัปเดต ', lnEd(K, 'update', {text:true, w:130}), ' · จากเอกสารมาตรฐานโรงงาน');
+}
+function lnTable(head, rows){
   return h('div', {class:'ln-table-wrap'},
     h('table', {class:'ln-table'},
       h('thead', {}, h('tr', {}, head.map(t=>h('th', {}, t)))),
@@ -27,9 +117,23 @@ function lnTable(head, rows, opts={}){
   );
 }
 function lnTip(text){ return h('div', {class:'ln-tip'}, h('b', {}, '💡 จำไว้ '), text); }
+// Top-bar ✏️ toggles edit mode; the banner explains it and offers reset.
+function lnEditChrome(wrap){
+  state.chrome.menu = {icon: LN.edit ? '✔' : '✏️', action:()=>{ LN.edit = !LN.edit; render(); }};
+  if (!LN.edit) return;
+  wrap.appendChild(h('div', {class:'ln-edit-banner'},
+    h('div', {}, h('b', {}, '✏️ โหมดแก้ไข'), ' แตะที่ตัวเลขเพื่อแก้ ระบบบันทึกให้ทันทีและส่งให้เครื่องอื่นด้วย'),
+    h('div', {class:'bt'},
+      h('button', {class:'btn small', onclick:()=>{ LN.edit = false; render(); }}, 'เสร็จสิ้น'),
+      h('button', {class:'btn secondary small', onclick:lnReset}, 'รีเซ็ตเป็นค่าตั้งต้น')
+    )
+  ));
+}
 
 /* ---------------- home ---------------- */
 VIEWS.learnHome = function(){
+  LN.edit = false;
+  lnStartSync();
   state.chrome.title = 'ความรู้งานผลิต';
   state.chrome.subtitle = 'ไว้ทบทวนสำหรับพนักงาน';
   const wrap = h('div', {class:'ln-home'});
@@ -49,16 +153,24 @@ VIEWS.learnHome = function(){
     h('div', {class:'tx'}, h('div', {class:'tt'}, 'ทำแบบทดสอบ'), h('div', {class:'ts'}, 'สุ่มโจทย์ 10 ข้อ จากข้อมูลทุกหัวข้อ')),
     h('div', {class:'chev'}, '›')
   ));
+  wrap.appendChild(h('div', {class:'ln-hint'}, 'หัวหน้าแก้ตัวเลขได้ในแต่ละหัวข้อ โดยกดปุ่ม ✏️ มุมขวาบน'));
   return wrap;
 };
 
 /* ---------------- mix design ---------------- */
+// Total weight = every ingredient (water & admixture included), as in the sheet.
+function lnMixTotal(r){
+  r.total = lnRound2(['cement','s1','s34','s38','sand','adm','water'].reduce((s,k)=>s + (typeof r[k] === 'number' ? r[k] : 0), 0));
+}
 VIEWS.learnMix = function(){
   state.chrome.title = 'สูตรคอนกรีต';
   state.chrome.subtitle = 'Mix Design · กก. ต่อ 1 ลบ.ม.';
   const M = KNOWLEDGE.mix;
   const st = VIEWS.learnMix._s || (VIEWS.learnMix._s = {i:0, full:false});
+  if (st.i >= M.rows.length) st.i = 0;
+  if (LN.edit) st.full = false;
   const wrap = h('div', {class:'ln-page'});
+  lnEditChrome(wrap);
   const body = h('div', {});
 
   const draw = ()=>{
@@ -68,31 +180,49 @@ VIEWS.learnMix = function(){
         ['สูตร','สินค้า','สูตรบนแพล้น','Slump','ปูน','หิน 1"','หิน 3/4"','หิน 3/8"','ทราย','น้ำยา (ล.)','น้ำ','รวม'],
         M.rows.map(r=>({cells:[r.label, r.name, r.formula, r.slump, lnNum(r.cement), lnNum(r.s1), lnNum(r.s34), lnNum(r.s38), lnNum(r.sand), lnNum(r.adm), lnNum(r.water), lnNum(r.total)]}))
       ));
-    } else {
-      const r = M.rows[st.i];
-      body.appendChild(h('div', {class:'card ln-detail'},
-        h('div', {class:'ln-dt'}, r.label + ' · ' + r.name),
-        h('div', {class:'ln-slump'}, 'สูตรบนแพล้น ', h('b', {}, r.formula), ' · ต้องการ ', h('b', {}, r.need), h('br'), 'Slump ', h('b', {}, r.slump), ' ซม. · ค่าแอมป์สลัมป์ ', h('b', {}, r.amp + '%')),
-        h('div', {class:'ln-ing'},
-          [['ปูนผง', r.cement, 'กก.'], ['หิน 1 นิ้ว', r.s1, 'กก.'], ['หิน 3/4 นิ้ว', r.s34, 'กก.'], ['หิน 3/8 นิ้ว', r.s38, 'กก.'],
-           ['ทราย', r.sand, 'กก.'], ['น้ำยา ' + r.admName, r.adm, 'ลิตร'], ['น้ำ', r.water, 'กก.']]
-            .filter(x=>x[1] !== '-' && x[1] != null)
-            .map(x=>h('div', {class:'row'}, h('span', {}, x[0]), h('b', {}, lnNum(x[1], 3) + ' ' + x[2])))
-        ),
-        h('div', {class:'ln-total'}, h('span', {}, 'น้ำหนักรวม'), h('b', {}, lnNum(r.total) + ' กก.'))
-      ));
+      return;
     }
+    const r = M.rows[st.i];
+    const ings = [['ปูนผง','cement','กก.'], ['หิน 1 นิ้ว','s1','กก.'], ['หิน 3/4 นิ้ว','s34','กก.'], ['หิน 3/8 นิ้ว','s38','กก.'],
+                  ['ทราย','sand','กก.'], ['น้ำยาผสมเพิ่ม','adm','ลิตร'], ['น้ำ','water','กก.']];
+    const unit = (u)=>' ' + u;
+    const card = h('div', {class:'card ln-detail'});
+    if (LN.edit){
+      card.append(
+        h('div', {class:'ln-meta'}, h('span', {}, 'รหัส'), lnEd(r, 'label', {text:true, w:90})),
+        h('div', {class:'ln-meta'}, h('span', {}, 'สินค้า'), lnEd(r, 'name', {text:true, w:230})),
+        h('div', {class:'ln-meta'}, h('span', {}, 'สูตรบนแพล้น'), lnEd(r, 'formula', {text:true, w:110})),
+        h('div', {class:'ln-meta'}, h('span', {}, 'ต้องการ'), lnEd(r, 'need', {text:true, w:150})),
+        h('div', {class:'ln-meta'}, h('span', {}, 'Slump (ซม.)'), lnEd(r, 'slump', {text:true, w:110})),
+        h('div', {class:'ln-meta'}, h('span', {}, 'แอมป์สลัมป์ (%)'), lnEd(r, 'amp', {w:80})),
+        h('div', {class:'ln-meta'}, h('span', {}, 'ชื่อน้ำยา'), lnEd(r, 'admName', {text:true, w:110}))
+      );
+    } else {
+      card.append(
+        h('div', {class:'ln-dt'}, r.label + ' · ' + r.name),
+        h('div', {class:'ln-slump'}, 'สูตรบนแพล้น ', h('b', {}, r.formula), ' · ต้องการ ', h('b', {}, r.need), h('br'), 'Slump ', h('b', {}, r.slump), ' ซม. · ค่าแอมป์สลัมป์ ', h('b', {}, r.amp + '%'))
+      );
+    }
+    card.appendChild(h('div', {class:'ln-ing'},
+      ings.filter(x=>LN.edit || (r[x[1]] !== '-' && r[x[1]] != null)).map(x=>h('div', {class:'row'},
+        h('span', {}, x[0] === 'น้ำยาผสมเพิ่ม' ? 'น้ำยา ' + r.admName : x[0]),
+        h('b', {}, lnEd(r, x[1], {d:3, after:()=>lnMixTotal(r)}), unit(x[2]))
+      ))
+    ));
+    card.appendChild(h('div', {class:'ln-total'}, h('span', {}, 'น้ำหนักรวม'), h('b', {}, lnEd(r, 'total', {d:2}), unit('กก.'))));
+    if (LN.edit) card.appendChild(h('div', {class:'ln-hint'}, 'น้ำหนักรวมคำนวณใหม่อัตโนมัติเมื่อแก้ส่วนผสม (แก้ทับเองได้)'));
+    body.appendChild(card);
   };
 
   const pick = h('div', {class:'filter-chips'});
   const drawChips = ()=>{
     pick.replaceChildren(
       ...M.rows.map((r,i)=>h('button', {class:'filter-chip' + (!st.full && st.i===i ? ' active' : ''), onclick:()=>{ st.i=i; st.full=false; drawChips(); draw(); }}, r.label)),
-      h('button', {class:'filter-chip' + (st.full ? ' active' : ''), onclick:()=>{ st.full=true; drawChips(); draw(); }}, 'ดูตารางรวม')
+      LN.edit ? null : h('button', {class:'filter-chip' + (st.full ? ' active' : ''), onclick:()=>{ st.full=true; drawChips(); draw(); }}, 'ดูตารางรวม')
     );
   };
   drawChips(); draw();
-  wrap.append(pick, body, lnTip(M.note), lnUpdated(M.update));
+  wrap.append(pick, body, h('div', {class:'ln-tip'}, h('b', {}, '💡 จำไว้ '), lnEd(M, 'note', {text:true, w:280, show:v=>v})), lnUpdated(M));
   return wrap;
 };
 
@@ -102,28 +232,34 @@ VIEWS.learnRing = function(){
   state.chrome.subtitle = 'จำนวนคู่ตามความยาวเสาเข็ม';
   const R = KNOWLEDGE.ring;
   const st = VIEWS.learnRing._s || (VIEWS.learnRing._s = {t:'I-18', len:null});
+  if (!R.rings.some(x=>x.type===st.t)) st.t = R.rings[0].type;
   const wrap = h('div', {class:'ln-page'});
+  lnEditChrome(wrap);
   const body = h('div', {});
 
   const draw = ()=>{
     const ring = R.rings.find(x=>x.type===st.t);
     body.replaceChildren();
-    body.appendChild(h('div', {class:'ln-sub'}, ring.title));
-    const sel = ring.rows.find(r=>r[0]===st.len);
+    body.appendChild(h('div', {class:'ln-sub'}, lnEd(ring, 'title', {text:true, w:280, show:v=>v})));
+    const sel = !LN.edit && ring.rows.find(r=>r[0]===st.len);
     if (sel){
       body.appendChild(h('div', {class:'card ln-result'},
         h('div', {class:'q'}, ring.type + ' ยาว ' + lnNum(sel[0]) + ' ม. ต้องใช้ปลอกแหวน'),
         h('div', {class:'big'}, lnNum(sel[3]), h('span', {}, ' คู่')),
         h('div', {class:'brk'}, 'หัว A+B (รวม 2 ด้าน) ', h('b', {}, lnNum(sel[1])), ' คู่  +  ช่วงกลาง C ', h('b', {}, lnNum(sel[2])), ' คู่')
       ));
-    } else {
+    } else if (!LN.edit){
       body.appendChild(h('div', {class:'ln-hint'}, 'แตะแถวในตาราง เพื่อดูสรุปของความยาวนั้น'));
     }
+    const total = (row)=>{ if (typeof row[1] === 'number' && typeof row[2] === 'number') row[3] = lnRound2(row[1] + row[2]); };
     body.appendChild(lnTable(
       ['ยาว (ม.)','หัว A+B (คู่)','ช่วงกลาง C (คู่)','รวม (คู่)'],
-      ring.rows.map(r=>({_hl: r[0]===st.len, cells:[lnNum(r[0]), lnNum(r[1]), lnNum(r[2]), h('b', {}, lnNum(r[3]))]}))
+      ring.rows.map(r=>({_hl: !LN.edit && r[0]===st.len, cells:[
+        lnEd(r, 0, {w:60}), lnEd(r, 1, {after:()=>total(r)}), lnEd(r, 2, {after:()=>total(r)}), LN.edit ? lnEd(r, 3) : h('b', {}, lnNum(r[3]))
+      ]}))
     ));
-    body.querySelectorAll('tbody tr').forEach((tr,i)=>{
+    if (LN.edit) body.appendChild(h('div', {class:'ln-hint'}, 'รวม (คู่) = หัว A+B + ช่วงกลาง C คำนวณให้อัตโนมัติ'));
+    else body.querySelectorAll('tbody tr').forEach((tr,i)=>{
       tr.addEventListener('click', ()=>{ st.len = ring.rows[i][0]; draw(); });
     });
   };
@@ -134,7 +270,7 @@ VIEWS.learnRing = function(){
   drawChips(); draw();
   wrap.append(chips, body,
     lnTip('ปลอกแหวนนับเป็น "คู่" · ช่วงหัว A+B คือรวมทั้ง 2 ด้านของเสา ส่วนช่วงกลาง C คือช่วงที่เหลือ · เสา I ใช้ลวด 2.50–2.80 มม. ส่วน SQ (มอก.) ใช้ลวด 2.80 มม.'),
-    lnUpdated(R.update));
+    lnUpdated(R));
   return wrap;
 };
 
@@ -144,16 +280,21 @@ VIEWS.learnWire = function(){
   state.chrome.subtitle = 'จำนวนเส้นตามชนิดและความยาวเสา';
   const W = KNOWLEDGE.wire;
   const wrap = h('div', {class:'ln-page'});
+  lnEditChrome(wrap);
   const groups = [];
   W.rows.forEach(r=>{ let g = groups.find(x=>x.pile===r.pile); if (!g){ g = {pile:r.pile, rows:[]}; groups.push(g); } g.rows.push(r); });
   groups.forEach(g=>{
     wrap.appendChild(h('div', {class:'card ln-group'},
       h('div', {class:'ln-gt'}, g.pile),
       lnTable(['ความยาว (ม.)','ลวด 4 มม. (เส้น)','ลวด 5 มม. (เส้น)'],
-        g.rows.map(r=>({cells:[r.len, h('b', {}, lnNum(r.w4)), r.w5 ? h('b', {}, lnNum(r.w5)) : '–']})))
+        g.rows.map(r=>({cells:[
+          lnEd(r, 'len', {text:true, w:110, show:v=>v}),
+          LN.edit ? lnEd(r, 'w4', {zero:true}) : h('b', {}, lnNum(r.w4)),
+          LN.edit ? lnEd(r, 'w5', {zero:true}) : (r.w5 ? h('b', {}, lnNum(r.w5)) : '–')
+        ]})))
     ));
   });
-  wrap.append(lnTip('เสาสั้นใช้ลวดน้อยเส้นกว่า เสายาวใช้เพิ่ม · ช่วงยาวมากๆ (เช่น 12–14 ม.) จะมีลวด 5 มม. เพิ่มเข้ามา'), lnUpdated(W.update));
+  wrap.append(lnTip('เสาสั้นใช้ลวดน้อยเส้นกว่า เสายาวใช้เพิ่ม · ช่วงยาวมากๆ (เช่น 12–14 ม.) จะมีลวด 5 มม. เพิ่มเข้ามา'), lnUpdated(W));
   return wrap;
 };
 
@@ -163,17 +304,19 @@ VIEWS.learnPlate = function(){
   state.chrome.subtitle = 'มาตรฐานโรงงาน';
   const P = KNOWLEDGE.plate;
   const wrap = h('div', {class:'ln-page'});
+  lnEditChrome(wrap);
   wrap.appendChild(h('div', {class:'card ln-group'},
     h('div', {class:'ln-gt'}, 'เหล็กเพลท (หัวเสา)'),
     lnTable(['เสา','หนา (มม.)','น.น./แผ่น สำเร็จรูป (กก.)','ตัดได้ (แผ่น / 1.5×6 ม.)'],
-      P.plates.map(p=>({cells:[p.pile, lnNum(p.thick), h('b', {}, lnNum(p.kg, 3)), lnNum(p.perSheet)]})))
+      P.plates.map(p=>({cells:[lnEd(p, 'pile', {text:true, w:70, show:v=>v}), lnEd(p, 'thick'), LN.edit ? lnEd(p, 'kg', {d:3}) : h('b', {}, lnNum(p.kg, 3)), lnEd(p, 'perSheet')]})))
   ));
   wrap.appendChild(h('div', {class:'card ln-group'},
     h('div', {class:'ln-gt'}, 'เหล็กหนวดกุ้ง (ขาเพลท ตัว L)'),
     lnTable(['เสา','ยาวเสา (ม.)','ขนาดเหล็ก','ยาว (ซม.)','จำนวน','น.น.มาตรฐาน (กก.)'],
-      P.legs.map(l=>({cells:[l.pile, l.len, l.bar, lnNum(l.cm), l.n, h('b', {}, lnNum(l.std, 3))]})))
+      P.legs.map(l=>({cells:[lnEd(l, 'pile', {text:true, w:70, show:v=>v}), lnEd(l, 'len', {text:true, w:100, show:v=>v}), lnEd(l, 'bar', {text:true, w:110, show:v=>v}),
+        lnEd(l, 'cm'), lnEd(l, 'n', {text:true, w:70, show:v=>v}), LN.edit ? lnEd(l, 'std', {d:3}) : h('b', {}, lnNum(l.std, 3))]})))
   ));
-  wrap.append(lnTip('เหล็กหนวดกุ้ง I-22 ใช้ 2 ขนาดผสมกัน: RB9 จำนวน 2 เส้น + DB12 จำนวน 2 เส้น'), lnUpdated(P.update));
+  wrap.append(lnTip('เหล็กหนวดกุ้ง I-22 ใช้ 2 ขนาดผสมกัน: RB9 จำนวน 2 เส้น + DB12 จำนวน 2 เส้น'), lnUpdated(P));
   return wrap;
 };
 
