@@ -65,17 +65,17 @@ VIEWS.learnMix = function(){
     body.replaceChildren();
     if (st.full){
       body.appendChild(lnTable(
-        ['สินค้า','Slump','ปูนผง','หิน 1"','หิน 3/4"','หิน 3/8"','ทราย','น้ำยา (ล.)','น้ำ','รวม'],
-        M.rows.map(r=>({cells:[r.name, r.slump, lnNum(r.cement), lnNum(r.s1), lnNum(r.s34), lnNum(r.s38), lnNum(r.sand), lnNum(r.adm), lnNum(r.water), lnNum(r.total)]}))
+        ['สูตร','สินค้า','สูตรบนแพล้น','Slump','ปูน','หิน 1"','หิน 3/4"','หิน 3/8"','ทราย','น้ำยา (ล.)','น้ำ','รวม'],
+        M.rows.map(r=>({cells:[r.label, r.name, r.formula, r.slump, lnNum(r.cement), lnNum(r.s1), lnNum(r.s34), lnNum(r.s38), lnNum(r.sand), lnNum(r.adm), lnNum(r.water), lnNum(r.total)]}))
       ));
     } else {
       const r = M.rows[st.i];
       body.appendChild(h('div', {class:'card ln-detail'},
-        h('div', {class:'ln-dt'}, r.name),
-        h('div', {class:'ln-slump'}, 'Slump ', h('b', {}, r.slump), ' ซม.'),
+        h('div', {class:'ln-dt'}, r.label + ' · ' + r.name),
+        h('div', {class:'ln-slump'}, 'สูตรบนแพล้น ', h('b', {}, r.formula), ' · ต้องการ ', h('b', {}, r.need), h('br'), 'Slump ', h('b', {}, r.slump), ' ซม. · ค่าแอมป์สลัมป์ ', h('b', {}, r.amp + '%')),
         h('div', {class:'ln-ing'},
           [['ปูนผง', r.cement, 'กก.'], ['หิน 1 นิ้ว', r.s1, 'กก.'], ['หิน 3/4 นิ้ว', r.s34, 'กก.'], ['หิน 3/8 นิ้ว', r.s38, 'กก.'],
-           ['ทราย', r.sand, 'กก.'], ['น้ำยาผสมเพิ่ม', r.adm, 'ลิตร'], ['น้ำ', r.water, 'กก.']]
+           ['ทราย', r.sand, 'กก.'], ['น้ำยา ' + r.admName, r.adm, 'ลิตร'], ['น้ำ', r.water, 'กก.']]
             .filter(x=>x[1] !== '-' && x[1] != null)
             .map(x=>h('div', {class:'row'}, h('span', {}, x[0]), h('b', {}, lnNum(x[1], 3) + ' ' + x[2])))
         ),
@@ -87,7 +87,7 @@ VIEWS.learnMix = function(){
   const pick = h('div', {class:'filter-chips'});
   const drawChips = ()=>{
     pick.replaceChildren(
-      ...M.rows.map((r,i)=>h('button', {class:'filter-chip' + (!st.full && st.i===i ? ' active' : ''), onclick:()=>{ st.i=i; st.full=false; drawChips(); draw(); }}, r.name)),
+      ...M.rows.map((r,i)=>h('button', {class:'filter-chip' + (!st.full && st.i===i ? ' active' : ''), onclick:()=>{ st.i=i; st.full=false; drawChips(); draw(); }}, r.label)),
       h('button', {class:'filter-chip' + (st.full ? ' active' : ''), onclick:()=>{ st.full=true; drawChips(); draw(); }}, 'ดูตารางรวม')
     );
   };
@@ -187,9 +187,9 @@ function lnBuildQuestions(){
   const K = KNOWLEDGE, qs_ = [];
   const mk = (q, correct, pool, fmt, why)=>{ const f = fmt || (v=>lnNum(v,3)); const opts = lnPickOptions(correct, pool, f); if (opts.length >= 3) qs_.push({q, opts, ans:f(correct), why}); };
   K.mix.rows.forEach(r=>{
-    mk(`สูตร “${r.name}” ใช้ปูนผงกี่ กก. ต่อ 1 ลบ.ม.?`, r.cement, K.mix.rows.map(x=>x.cement), v=>lnNum(v)+' กก.', 'ดูที่หัวข้อ สูตรคอนกรีต');
-    mk(`สูตร “${r.name}” ใช้น้ำกี่ กก.?`, r.water, K.mix.rows.map(x=>x.water), v=>lnNum(v)+' กก.', 'ดูที่หัวข้อ สูตรคอนกรีต');
-    mk(`สูตร “${r.name}” ค่า Slump เท่าไร?`, r.slump, K.mix.rows.map(x=>x.slump), v=>v+' ซม.', 'Slump คือค่าความข้นเหลวของคอนกรีตสด');
+    mk(`สูตร ${r.label} (${r.name}) ใช้ปูนกี่ กก. ต่อ 1 ลบ.ม.?`, r.cement, K.mix.rows.map(x=>x.cement), v=>lnNum(v)+' กก.', 'ดูที่หัวข้อ สูตรคอนกรีต');
+    mk(`สูตร ${r.label} (${r.name}) ใช้น้ำกี่ กก.?`, r.water, K.mix.rows.map(x=>x.water), v=>lnNum(v)+' กก.', 'ดูที่หัวข้อ สูตรคอนกรีต');
+    mk(`สูตร ${r.label} (${r.name}) ค่า Slump เท่าไร?`, r.slump, K.mix.rows.map(x=>x.slump), v=>v+' ซม.', 'Slump คือค่าความข้นเหลวของคอนกรีตสด');
   });
   K.ring.rings.forEach(rg=>{
     lnShuffle(rg.rows).slice(0,3).forEach(row=>{
